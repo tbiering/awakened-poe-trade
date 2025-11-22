@@ -11,7 +11,7 @@ export interface StatMatcher {
 export enum StatBetter {
   NegativeRoll = -1,
   PositiveRoll = 1,
-  NotComparable = 0
+  NotComparable = 0,
 }
 
 export interface Stat {
@@ -38,15 +38,18 @@ export interface StatGroup {
 export type StatOrGroup = Stat | StatGroup
 
 export type StatGroupResolver =
-  {
+  | {
     strat: 'select'
     test: Array<string | null>
-  } | {
+  }
+  | {
     strat: 'trivial-merge'
-  } | {
+  }
+  | {
     strat: 'percent-merge'
     kind: Array<'percent' | 'value'>
-  } | {
+  }
+  | {
     strat: 'flag-merge'
     kind: Array<'flag' | 'value'>
   }
@@ -59,13 +62,7 @@ export interface DropEntry {
 export interface BaseType {
   name: string
   refName: string
-  namespace: (
-    'DIVINATION_CARD' |
-    'CAPTURED_BEAST' |
-    'UNIQUE' |
-    'ITEM' |
-    'GEM'
-  )
+  namespace: 'DIVINATION_CARD' | 'CAPTURED_BEAST' | 'UNIQUE' | 'ITEM' | 'GEM'
   icon: string
   w?: number
   h?: number
@@ -213,6 +210,13 @@ export interface TranslationDict {
   UNMODIFIABLE: string
   FOULBORN_NAME: RegExp
   FOULBORN_MODIFIER: string
+  INSCRIBED_ULTIMATUM_CHALLENGE: RegExp
+  INSCRIBED_ULTIMATUM_SACRIFICE: RegExp
+  INSCRIBED_ULTIMATUM_REWARD: RegExp
+  INSCRIBED_ULTIMATUM_TIER: RegExp
+  INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY: RegExp
+  INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS: RegExp
+  INSCRIBED_ULTIMATUM_REWARD_MIRRORED_COPY: RegExp
   // ---
   CHAT_SYSTEM: RegExp
   CHAT_TRADE: RegExp

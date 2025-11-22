@@ -53,9 +53,11 @@ export default {
   VEILED_PREFIX: 'Veiled Prefix',
   VEILED_SUFFIX: 'Veiled Suffix',
   FLASK_CHARGES: /^Currently has \d+ Charges$/,
-  METAMORPH_HELP: "Combine this with four other different samples in Tane's Laboratory.",
+  METAMORPH_HELP:
+    "Combine this with four other different samples in Tane's Laboratory.",
   BEAST_HELP: 'Right-click to add this to your bestiary.',
-  VOIDSTONE_HELP: 'Socket this into your Atlas to increase the Tier of all Maps.',
+  VOIDSTONE_HELP:
+    'Socket this into your Atlas to increase the Tier of all Maps.',
   METAMORPH_BRAIN: /^.* Brain$/,
   METAMORPH_EYE: /^.* Eye$/,
   METAMORPH_LUNG: /^.* Lung$/,
@@ -69,11 +71,12 @@ export default {
   HEIST_WINGS_REVEALED: 'Wings Revealed: ',
   HEIST_TARGET: 'Heist Target: ',
   HEIST_BLUEPRINT_ENCHANTS: 'Enchanted Armaments',
-  HEIST_BLUEPRINT_TRINKETS: 'Thieves\' Trinkets or Currency',
+  HEIST_BLUEPRINT_TRINKETS: "Thieves' Trinkets or Currency",
   HEIST_BLUEPRINT_GEMS: 'Unusual Gems',
   HEIST_BLUEPRINT_REPLICAS: 'Replicas or Experimented Items',
   MIRRORED: 'Mirrored',
-  MODIFIER_LINE: /^(?<type>[^"]+)(?:\s+"(?<name>[^"]*)")?(?:\s+\(Tier: (?<tier>\d+)\))?(?:\s+\(Rank: (?<rank>\d+)\))?$/,
+  MODIFIER_LINE:
+    /^(?<type>[^"]+)(?:\s+"(?<name>[^"]*)")?(?:\s+\(Tier: (?<tier>\d+)\))?(?:\s+\(Rank: (?<rank>\d+)\))?$/,
   PREFIX_MODIFIER: 'Prefix Modifier',
   SUFFIX_MODIFIER: 'Suffix Modifier',
   CRAFTED_PREFIX: 'Master Crafted Prefix Modifier',
@@ -100,11 +103,32 @@ export default {
   WARLORD_MODS: ["Warlord's", 'of the Conquest'],
   DELVE_MODS: ['Subterranean', 'of the Underground'],
   VEILED_MODS: ['Chosen', 'of the Order'],
-  INCURSION_MODS: ["Guatelitzi's", "Xopec's", "Topotante's", "Tacati's", "Matatl's", 'of Matatl', "Citaqualotl's", 'of Citaqualotl', 'of Tacati', 'of Guatelitzi', 'of Puhuarte'],
+  INCURSION_MODS: [
+    "Guatelitzi's",
+    "Xopec's",
+    "Topotante's",
+    "Tacati's",
+    "Matatl's",
+    'of Matatl',
+    "Citaqualotl's",
+    'of Citaqualotl',
+    'of Tacati',
+    'of Guatelitzi',
+    'of Puhuarte'
+  ],
   FOIL_UNIQUE: 'Foil Unique',
   UNMODIFIABLE: 'Unmodifiable',
   FOULBORN_NAME: /^Foulborn (.*)$/,
   FOULBORN_MODIFIER: 'Foulborn Unique Modifier',
+  INSCRIBED_ULTIMATUM_CHALLENGE: /^Challenge: (.*)$/,
+  INSCRIBED_ULTIMATUM_SACRIFICE:
+    /^Requires Sacrifice: (?<item>.*?)(?: x(?<quantity>\d+))?$/,
+  INSCRIBED_ULTIMATUM_REWARD: /^Reward: (.*)$/,
+  INSCRIBED_ULTIMATUM_TIER: /^(\d+)% more Monster Life$/,
+  INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY: /^Doubles sacrificed Currency$/,
+  INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS:
+    /^Doubles sacrificed Divination Cards$/,
+  INSCRIBED_ULTIMATUM_REWARD_MIRRORED_COPY: /^Item and Mirrored Copy$/,
   // ---
   CHAT_SYSTEM: /^: (?<body>.+)$/,
   CHAT_TRADE: /^\$(?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,
@@ -112,6 +136,8 @@ export default {
   CHAT_PARTY: /^%(?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,
   CHAT_GUILD: /^&(?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,
   CHAT_WHISPER_TO: /^@To (?<char_name>.+?): (?<body>.+)$/,
-  CHAT_WHISPER_FROM: /^@From (?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,
-  CHAT_WEBTRADE_GEM: /^level (?<gem_lvl>\d+) (?<gem_qual>\d+)% (?<gem_name>.+)$/
+  CHAT_WHISPER_FROM:
+    /^@From (?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,
+  CHAT_WEBTRADE_GEM:
+    /^level (?<gem_lvl>\d+) (?<gem_qual>\d+)% (?<gem_name>.+)$/
 }

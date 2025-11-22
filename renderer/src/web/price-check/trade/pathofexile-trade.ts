@@ -1,9 +1,21 @@
 import { ItemInfluence, ItemCategory, ParsedItem, ItemRarity } from '@/parser'
-import { ItemFilters, StatFilter, INTERNAL_TRADE_IDS, InternalTradeId } from '../filters/interfaces'
+import {
+  ItemFilters,
+  StatFilter,
+  INTERNAL_TRADE_IDS,
+  InternalTradeId
+} from '../filters/interfaces'
 import { setProperty as propSet } from 'dot-prop'
 import { DateTime } from 'luxon'
 import { Host } from '@/web/background/IPC'
-import { TradeResponse, Account, getTradeEndpoint, adjustRateLimits, RATE_LIMIT_RULES, preventQueueCreation } from './common'
+import {
+  TradeResponse,
+  Account,
+  getTradeEndpoint,
+  adjustRateLimits,
+  RATE_LIMIT_RULES,
+  preventQueueCreation
+} from './common'
 import { stat, STAT_BY_REF_V2, pseudoStatByRef } from '@/assets/data'
 import { RateLimiter } from './RateLimiter'
 import { ModifierType } from '@/parser/modifiers'
@@ -85,10 +97,16 @@ const FLASK = {
   INCR_EFFECT: stat('#% increased effect')
 }
 
-interface FilterBoolean { option?: 'true' | 'false' }
-interface FilterRange { min?: number, max?: number }
+interface FilterBoolean {
+  option?: 'true' | 'false'
+}
+interface FilterRange {
+  min?: number
+  max?: number
+}
 
-interface TradeRequest { /* eslint-disable camelcase */
+interface TradeRequest {
+  /* eslint-disable camelcase */
   query: {
     status: { option: 'online' | 'securable' | 'available' | 'any' }
     name?: string | { discriminator: string, option: string }
@@ -190,6 +208,15 @@ interface TradeRequest { /* eslint-disable camelcase */
           sentinel_durability?: FilterRange
         }
       }
+      ultimatum_filters?: {
+        disabled?: boolean
+        filters: {
+          ultimatum_challenge?: { option?: string }
+          ultimatum_reward?: { option?: string }
+          ultimatum_input?: { option?: string }
+          ultimatum_output?: { option?: string }
+        }
+      }
       trade_filters?: {
         filters: {
           collapse?: FilterBoolean
@@ -220,10 +247,10 @@ interface FetchResult {
     properties?: Array<{
       values: [[string, number]]
       type:
-      78 | // Corpse Level (Filled Coffin)
-      30 | // Spawns a Level %0 Monster when Harvested
-      6 | // Quality
-      5 // Level
+      | 78 // Corpse Level (Filled Coffin)
+      | 30 // Spawns a Level %0 Monster when Harvested
+      | 6 // Quality
+      | 5 // Level
     }>
     note?: string
   }
@@ -257,16 +284,26 @@ export interface PricingResult {
   ign: string
 }
 
-export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], item: ParsedItem) {
+export function createTradeRequest (
+  filters: ItemFilters,
+  stats: StatFilter[],
+  item: ParsedItem
+) {
   const body: TradeRequest = {
     query: {
       status: {
         option: filters.trade.offline
           ? 'any'
-          : (filters.trade.merchantOnly ? 'securable' : 'available')
+          : filters.trade.merchantOnly
+            ? 'securable'
+            : 'available'
       },
       stats: [
-        { type: 'and', filters: [] }
+        {
+          type: 'and',
+          filters: [],
+          disabled: false
+        }
       ],
       filters: {}
     },
@@ -277,20 +314,36 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
   const { query } = body
 
   if (filters.trade.currency) {
-    propSet(query.filters, 'trade_filters.filters.price.option', filters.trade.currency)
+    propSet(
+      query.filters,
+      'trade_filters.filters.price.option',
+      filters.trade.currency
+    )
   }
 
-  if (filters.trade.collapseListings === 'api' && (filters.trade.offline || !filters.trade.merchantOnly)) {
-    propSet(query.filters, 'trade_filters.filters.collapse.option', String(true))
+  if (
+    filters.trade.collapseListings === 'api' &&
+    (filters.trade.offline || !filters.trade.merchantOnly)
+  ) {
+    propSet(
+      query.filters,
+      'trade_filters.filters.collapse.option',
+      String(true)
+    )
   }
 
   if (filters.trade.listed) {
-    propSet(query.filters, 'trade_filters.filters.indexed.option', filters.trade.listed)
+    propSet(
+      query.filters,
+      'trade_filters.filters.indexed.option',
+      filters.trade.listed
+    )
   }
 
-  const activeSearch = (filters.searchRelaxed && !filters.searchRelaxed.disabled)
-    ? filters.searchRelaxed
-    : filters.searchExact
+  const activeSearch =
+    filters.searchRelaxed && !filters.searchRelaxed.disabled
+      ? filters.searchRelaxed
+      : filters.searchExact
 
   if (activeSearch.nameTrade) {
     query.name = nameToQuery(activeSearch.nameTrade, filters)
@@ -307,7 +360,11 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
   if (filters.foil && !filters.foil.disabled) {
     propSet(query.filters, 'type_filters.filters.rarity.option', 'uniquefoil')
   } else if (filters.rarity) {
-    propSet(query.filters, 'type_filters.filters.rarity.option', (filters.rarity.disabled) ? 'nonunique' : filters.rarity.value)
+    propSet(
+      query.filters,
+      'type_filters.filters.rarity.option',
+      filters.rarity.disabled ? 'nonunique' : filters.rarity.value
+    )
   }
 
   if (activeSearch.category) {
@@ -320,92 +377,240 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
   }
 
   if (filters.corrupted?.value === false || filters.corrupted?.exact) {
-    propSet(query.filters, 'misc_filters.filters.corrupted.option', String(filters.corrupted.value))
+    propSet(
+      query.filters,
+      'misc_filters.filters.corrupted.option',
+      String(filters.corrupted.value)
+    )
   }
   if (filters.fractured?.value === false) {
-    propSet(query.filters, 'misc_filters.filters.fractured_item.option', String(false))
+    propSet(
+      query.filters,
+      'misc_filters.filters.fractured_item.option',
+      String(false)
+    )
   }
   if (filters.foulborn?.value === false) {
-    propSet(query.filters, 'misc_filters.filters.foulborn_item.option', String(false))
+    propSet(
+      query.filters,
+      'misc_filters.filters.foulborn_item.option',
+      String(false)
+    )
   }
   if (filters.mirrored) {
     if (filters.mirrored.disabled) {
-      propSet(query.filters, 'misc_filters.filters.mirrored.option', String(false))
+      propSet(
+        query.filters,
+        'misc_filters.filters.mirrored.option',
+        String(false)
+      )
     }
   } else if (
     item.rarity === ItemRarity.Normal ||
     item.rarity === ItemRarity.Magic ||
     item.rarity === ItemRarity.Rare
   ) {
-    propSet(query.filters, 'misc_filters.filters.mirrored.option', String(false))
+    propSet(
+      query.filters,
+      'misc_filters.filters.mirrored.option',
+      String(false)
+    )
   }
 
   if (filters.gemLevel && !filters.gemLevel.disabled) {
-    propSet(query.filters, 'misc_filters.filters.gem_level.min', filters.gemLevel.value)
+    propSet(
+      query.filters,
+      'misc_filters.filters.gem_level.min',
+      filters.gemLevel.value
+    )
   }
 
   if (filters.quality && !filters.quality.disabled) {
-    propSet(query.filters, 'misc_filters.filters.quality.min', filters.quality.value)
+    propSet(
+      query.filters,
+      'misc_filters.filters.quality.min',
+      filters.quality.value
+    )
   }
 
   if (filters.itemLevel && !filters.itemLevel.disabled) {
-    propSet(query.filters, 'misc_filters.filters.ilvl.min', filters.itemLevel.value)
+    propSet(
+      query.filters,
+      'misc_filters.filters.ilvl.min',
+      filters.itemLevel.value
+    )
     if (filters.itemLevel.max) {
-      propSet(query.filters, 'misc_filters.filters.ilvl.max', filters.itemLevel.max)
+      propSet(
+        query.filters,
+        'misc_filters.filters.ilvl.max',
+        filters.itemLevel.max
+      )
     }
   }
 
   if (filters.stackSize && !filters.stackSize.disabled) {
-    propSet(query.filters, 'misc_filters.filters.stack_size.min', filters.stackSize.value)
+    propSet(
+      query.filters,
+      'misc_filters.filters.stack_size.min',
+      filters.stackSize.value
+    )
+  }
+
+  // Handle Inscribed Ultimatum pseudo stats
+  const challengeMap: Record<string, string> = {
+    'Survive': 'Survival',
+    'Defeat waves of enemies': 'Exterminate',
+    'Protect the Altar': 'Defense',
+    'Stand in the Stone Circles': 'Conquer'
+  }
+  const rewardTypeMap: Record<string, string> = {
+    currency: 'DoubleCurrency',
+    divination_card: 'DoubleDivCards',
+    mirrored_copy: 'MirrorRare',
+    unique: 'ExchangeUnique'
+  }
+
+  let hasUltimatumFilters = false
+  for (const stat of stats) {
+    if (stat.tradeId[0] === 'ultimatum.challenge' && !stat.disabled) {
+      const challengeValue = stat.statRef.replace('ultimatum.challenge.', '')
+      const mappedChallenge = challengeMap[challengeValue] || challengeValue
+      propSet(
+        query.filters,
+        'ultimatum_filters.filters.ultimatum_challenge.option',
+        mappedChallenge
+      )
+      hasUltimatumFilters = true
+    } else if (stat.tradeId[0] === 'ultimatum.reward' && !stat.disabled) {
+      const rewardValue = stat.statRef.replace('ultimatum.reward.', '')
+      const rewardOption = rewardTypeMap[rewardValue]
+      if (rewardOption) {
+        propSet(
+          query.filters,
+          'ultimatum_filters.filters.ultimatum_reward.option',
+          rewardOption
+        )
+        hasUltimatumFilters = true
+      }
+    } else if (stat.tradeId[0] === 'ultimatum.input' && !stat.disabled) {
+      const inputValue = stat.statRef.replace('ultimatum.input.', '')
+      propSet(
+        query.filters,
+        'ultimatum_filters.filters.ultimatum_input.option',
+        inputValue
+      )
+      hasUltimatumFilters = true
+    } else if (stat.tradeId[0] === 'ultimatum.output' && !stat.disabled) {
+      const outputValue = stat.statRef.replace('ultimatum.output.', '')
+      propSet(
+        query.filters,
+        'ultimatum_filters.filters.ultimatum_output.option',
+        outputValue
+      )
+      hasUltimatumFilters = true
+    }
+  }
+
+  if (hasUltimatumFilters) {
+    propSet(query.filters, 'ultimatum_filters.disabled', false)
   }
 
   if (filters.linkedSockets && !filters.linkedSockets.disabled) {
-    propSet(query.filters, 'socket_filters.filters.links.min', filters.linkedSockets.value)
+    propSet(
+      query.filters,
+      'socket_filters.filters.links.min',
+      filters.linkedSockets.value
+    )
   }
 
   if (filters.whiteSockets && !filters.whiteSockets.disabled) {
-    propSet(query.filters, 'socket_filters.filters.sockets.w', filters.whiteSockets.value)
+    propSet(
+      query.filters,
+      'socket_filters.filters.sockets.w',
+      filters.whiteSockets.value
+    )
   }
 
   if (filters.mapTier && !filters.mapTier.disabled) {
-    propSet(query.filters, 'map_filters.filters.map_tier.min', filters.mapTier.value)
-    propSet(query.filters, 'map_filters.filters.map_tier.max', filters.mapTier.value)
+    propSet(
+      query.filters,
+      'map_filters.filters.map_tier.min',
+      filters.mapTier.value
+    )
+    propSet(
+      query.filters,
+      'map_filters.filters.map_tier.max',
+      filters.mapTier.value
+    )
   }
 
   if (filters.mapBlighted) {
     if (filters.mapBlighted.value === 'Blighted') {
-      propSet(query.filters, 'map_filters.filters.map_blighted.option', String(true))
+      propSet(
+        query.filters,
+        'map_filters.filters.map_blighted.option',
+        String(true)
+      )
     } else if (filters.mapBlighted.value === 'Blight-ravaged') {
-      propSet(query.filters, 'map_filters.filters.map_uberblighted.option', String(true))
+      propSet(
+        query.filters,
+        'map_filters.filters.map_uberblighted.option',
+        String(true)
+      )
     }
   }
 
   if (filters.mapCompletionReward) {
-    propSet(query.filters, 'map_filters.filters.map_completion_reward.option', filters.mapCompletionReward.nameTrade)
+    propSet(
+      query.filters,
+      'map_filters.filters.map_completion_reward.option',
+      filters.mapCompletionReward.nameTrade
+    )
   }
 
   if (filters.unidentified && !filters.unidentified.disabled) {
-    propSet(query.filters, 'misc_filters.filters.identified.option', String(false))
+    propSet(
+      query.filters,
+      'misc_filters.filters.identified.option',
+      String(false)
+    )
   }
 
   if (filters.areaLevel && !filters.areaLevel.disabled) {
-    propSet(query.filters, 'map_filters.filters.area_level.min', filters.areaLevel.value)
+    propSet(
+      query.filters,
+      'map_filters.filters.area_level.min',
+      filters.areaLevel.value
+    )
   }
 
   if (filters.heistWingsRevealed && !filters.heistWingsRevealed.disabled) {
-    propSet(query.filters, 'heist_filters.filters.heist_wings.min', filters.heistWingsRevealed.value)
+    propSet(
+      query.filters,
+      'heist_filters.filters.heist_wings.min',
+      filters.heistWingsRevealed.value
+    )
   }
 
   if (filters.sentinelCharge && !filters.sentinelCharge.disabled) {
-    propSet(query.filters, 'sentinel_filters.filters.sentinel_durability.min', filters.sentinelCharge.value)
+    propSet(
+      query.filters,
+      'sentinel_filters.filters.sentinel_durability.min',
+      filters.sentinelCharge.value
+    )
   }
 
   for (const stat of stats) {
     if (stat.tradeId[0] === 'item.has_empty_modifier') {
       const TARGET_ID = {
-        CRAFTED_MODIFIERS: pseudoStatByRef(TOTAL_MODS_TEXT.CRAFTED_MODIFIERS[stat.option!.value])!.trade.ids[ModifierType.Pseudo][0],
-        EMPTY_MODIFIERS: pseudoStatByRef(TOTAL_MODS_TEXT.EMPTY_MODIFIERS[stat.option!.value])!.trade.ids[ModifierType.Pseudo][0],
-        TOTAL_MODIFIERS: pseudoStatByRef(TOTAL_MODS_TEXT.TOTAL_MODIFIERS[0])!.trade.ids[ModifierType.Pseudo][0]
+        CRAFTED_MODIFIERS: pseudoStatByRef(
+          TOTAL_MODS_TEXT.CRAFTED_MODIFIERS[stat.option!.value]
+        )!.trade.ids[ModifierType.Pseudo][0],
+        EMPTY_MODIFIERS: pseudoStatByRef(
+          TOTAL_MODS_TEXT.EMPTY_MODIFIERS[stat.option!.value]
+        )!.trade.ids[ModifierType.Pseudo][0],
+        TOTAL_MODIFIERS: pseudoStatByRef(TOTAL_MODS_TEXT.TOTAL_MODIFIERS[0])!
+          .trade.ids[ModifierType.Pseudo][0]
       }
 
       query.stats.push({
@@ -413,8 +618,16 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
         value: { min: 1, max: 1 },
         disabled: stat.disabled,
         filters: [
-          { id: TARGET_ID.EMPTY_MODIFIERS, value: { min: 1, max: 1 }, disabled: stat.disabled },
-          { id: TARGET_ID.CRAFTED_MODIFIERS, value: { min: 1, max: undefined }, disabled: stat.disabled }
+          {
+            id: TARGET_ID.EMPTY_MODIFIERS,
+            value: { min: 1, max: 1 },
+            disabled: stat.disabled
+          },
+          {
+            id: TARGET_ID.CRAFTED_MODIFIERS,
+            value: { min: 1, max: undefined },
+            disabled: stat.disabled
+          }
         ]
       })
 
@@ -423,14 +636,23 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
         value: { min: 1, max: 1 },
         disabled: stat.disabled,
         filters: [
-          { id: TARGET_ID.EMPTY_MODIFIERS, value: { min: 1, max: 1 }, disabled: stat.disabled },
-          { id: TARGET_ID.TOTAL_MODIFIERS, value: { min: 6, max: undefined }, disabled: stat.disabled }
+          {
+            id: TARGET_ID.EMPTY_MODIFIERS,
+            value: { min: 1, max: 1 },
+            disabled: stat.disabled
+          },
+          {
+            id: TARGET_ID.TOTAL_MODIFIERS,
+            value: { min: 6, max: undefined },
+            disabled: stat.disabled
+          }
         ]
       })
-    } else if ( // https://github.com/SnosMe/awakened-poe-trade/issues/758
+    } else if (
+      // https://github.com/SnosMe/awakened-poe-trade/issues/758
       item.category === ItemCategory.Flask &&
       stat.statRef === FLASK.INCR_CHARGE_RECOVERY &&
-      !stats.some(s => s.statRef === FLASK.INCR_EFFECT)
+      !stats.some((s) => s.statRef === FLASK.INCR_EFFECT)
     ) {
       const statGroup = STAT_BY_REF_V2(FLASK.INCR_EFFECT)!
       if (!('stats' in statGroup && statGroup.resolve.strat === 'select')) {
@@ -442,9 +664,7 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
       query.stats.push({
         type: 'not',
         disabled: stat.disabled,
-        filters: [
-          { id: reducedEffectId, disabled: stat.disabled }
-        ]
+        filters: [{ id: reducedEffectId, disabled: stat.disabled }]
       })
     }
 
@@ -453,80 +673,205 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
     const input = stat.roll!
     switch (stat.tradeId[0] as InternalTradeId) {
       case 'item.base_percentile':
-        propSet(query.filters, 'armour_filters.filters.base_defence_percentile.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'armour_filters.filters.base_defence_percentile.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'armour_filters.filters.base_defence_percentile.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'armour_filters.filters.base_defence_percentile.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.memory_strands':
-        propSet(query.filters, 'misc_filters.filters.memory_level.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'misc_filters.filters.memory_level.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'misc_filters.filters.memory_level.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'misc_filters.filters.memory_level.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.armour':
-        propSet(query.filters, 'armour_filters.filters.ar.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'armour_filters.filters.ar.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'armour_filters.filters.ar.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'armour_filters.filters.ar.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.evasion_rating':
-        propSet(query.filters, 'armour_filters.filters.ev.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'armour_filters.filters.ev.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'armour_filters.filters.ev.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'armour_filters.filters.ev.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.energy_shield':
-        propSet(query.filters, 'armour_filters.filters.es.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'armour_filters.filters.es.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'armour_filters.filters.es.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'armour_filters.filters.es.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.ward':
-        propSet(query.filters, 'armour_filters.filters.ward.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'armour_filters.filters.ward.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'armour_filters.filters.ward.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'armour_filters.filters.ward.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.block':
-        propSet(query.filters, 'armour_filters.filters.block.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'armour_filters.filters.block.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'armour_filters.filters.block.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'armour_filters.filters.block.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.total_dps':
-        propSet(query.filters, 'weapon_filters.filters.dps.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'weapon_filters.filters.dps.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'weapon_filters.filters.dps.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'weapon_filters.filters.dps.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.physical_dps':
-        propSet(query.filters, 'weapon_filters.filters.pdps.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'weapon_filters.filters.pdps.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'weapon_filters.filters.pdps.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'weapon_filters.filters.pdps.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.elemental_dps':
-        propSet(query.filters, 'weapon_filters.filters.edps.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'weapon_filters.filters.edps.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'weapon_filters.filters.edps.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'weapon_filters.filters.edps.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.crit':
-        propSet(query.filters, 'weapon_filters.filters.crit.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'weapon_filters.filters.crit.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'weapon_filters.filters.crit.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'weapon_filters.filters.crit.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.aps':
-        propSet(query.filters, 'weapon_filters.filters.aps.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'weapon_filters.filters.aps.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'weapon_filters.filters.aps.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'weapon_filters.filters.aps.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.map_item_quantity':
-        propSet(query.filters, 'map_filters.filters.map_iiq.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'map_filters.filters.map_iiq.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'map_filters.filters.map_iiq.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'map_filters.filters.map_iiq.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.map_item_rarity':
-        propSet(query.filters, 'map_filters.filters.map_iir.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'map_filters.filters.map_iir.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'map_filters.filters.map_iir.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'map_filters.filters.map_iir.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
       case 'item.map_pack_size':
-        propSet(query.filters, 'map_filters.filters.map_packsize.min', typeof input.min === 'number' ? input.min : undefined)
-        propSet(query.filters, 'map_filters.filters.map_packsize.max', typeof input.max === 'number' ? input.max : undefined)
+        propSet(
+          query.filters,
+          'map_filters.filters.map_packsize.min',
+          typeof input.min === 'number' ? input.min : undefined
+        )
+        propSet(
+          query.filters,
+          'map_filters.filters.map_packsize.max',
+          typeof input.max === 'number' ? input.max : undefined
+        )
         break
     }
   }
 
-  type BareStatFilter = Omit<StatFilter, 'statRef' | 'text' | 'tag' | 'sources'>
-  const realStats: BareStatFilter[] = stats.filter(stat =>
-    !INTERNAL_TRADE_IDS.includes(stat.tradeId[0] as any))
+  type BareStatFilter = Omit<
+  StatFilter,
+  'statRef' | 'text' | 'tag' | 'sources'
+  >
+  const realStats: BareStatFilter[] = stats.filter(
+    (stat) => !INTERNAL_TRADE_IDS.includes(stat.tradeId[0] as any)
+  )
   if (filters.veiled) {
     for (const statRef of filters.veiled.statRefs) {
       const statOrGroup = STAT_BY_REF_V2(statRef)!
-      const dbStats = ('stats' in statOrGroup) ? statOrGroup.stats : [statOrGroup]
+      const dbStats =
+        'stats' in statOrGroup ? statOrGroup.stats : [statOrGroup]
       realStats.push({
         disabled: filters.veiled.disabled,
         tradeId: dbStats
-          .filter(dbStat => ModifierType.Veiled in dbStat.trade.ids)
-          .map(dbStat => dbStat.trade.ids[ModifierType.Veiled][0])
+          .filter((dbStat) => ModifierType.Veiled in dbStat.trade.ids)
+          .map((dbStat) => dbStat.trade.ids[ModifierType.Veiled][0])
       })
     }
   }
@@ -535,7 +880,8 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
     for (const influence of filters.influences) {
       realStats.push({
         disabled: influence.disabled,
-        tradeId: pseudoStatByRef(INFLUENCE_PSEUDO_TEXT[influence.value])!.trade.ids[ModifierType.Pseudo]
+        tradeId: pseudoStatByRef(INFLUENCE_PSEUDO_TEXT[influence.value])!.trade
+          .ids[ModifierType.Pseudo]
       })
     }
   }
@@ -549,7 +895,7 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
         type: 'count',
         value: { min: 1 },
         disabled: stat.disabled,
-        filters: stat.tradeId.map(id => tradeIdToQuery(id, stat))
+        filters: stat.tradeId.map((id) => tradeIdToQuery(id, stat))
       })
     }
   }
@@ -559,7 +905,10 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[], i
 
 const cache = new Cache()
 
-export async function requestTradeResultList (body: TradeRequest, leagueId: string): Promise<SearchResult> {
+export async function requestTradeResultList (
+  body: TradeRequest,
+  leagueId: string
+): Promise<SearchResult> {
   let data = cache.get<SearchResult>([body, leagueId])
 
   if (!data) {
@@ -570,24 +919,31 @@ export async function requestTradeResultList (body: TradeRequest, leagueId: stri
 
     await RateLimiter.waitMulti(RATE_LIMIT_RULES.SEARCH)
 
-    const response = await Host.proxy(`${getTradeEndpoint()}/api/trade/search/${leagueId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    })
+    const response = await Host.proxy(
+      `${getTradeEndpoint()}/api/trade/search/${leagueId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      }
+    )
     adjustRateLimits(RATE_LIMIT_RULES.SEARCH, response.headers)
 
-    const _data = await response.json() as TradeResponse<SearchResult>
+    const _data = (await response.json()) as TradeResponse<SearchResult>
     if (_data.error) {
       throw new Error(_data.error.message)
     } else {
       data = _data
     }
 
-    cache.set<SearchResult>([body, leagueId], data, Cache.deriveTtl(...RATE_LIMIT_RULES.SEARCH, ...RATE_LIMIT_RULES.FETCH))
+    cache.set<SearchResult>(
+      [body, leagueId],
+      data,
+      Cache.deriveTtl(...RATE_LIMIT_RULES.SEARCH, ...RATE_LIMIT_RULES.FETCH)
+    )
   }
 
   return data
@@ -603,40 +959,60 @@ export async function requestResults (
   if (!data) {
     await RateLimiter.waitMulti(RATE_LIMIT_RULES.FETCH)
 
-    const response = await Host.proxy(`${getTradeEndpoint()}/api/trade/fetch/${resultIds.join(',')}?query=${queryId}`)
+    const response = await Host.proxy(
+      `${getTradeEndpoint()}/api/trade/fetch/${resultIds.join(
+        ','
+      )}?query=${queryId}`
+    )
     adjustRateLimits(RATE_LIMIT_RULES.FETCH, response.headers)
 
-    const _data = await response.json() as TradeResponse<{ result: Array<FetchResult | null> }>
+    const _data = (await response.json()) as TradeResponse<{
+      result: Array<FetchResult | null>
+    }>
     if (_data.error) {
       throw new Error(_data.error.message)
     } else {
-      data = _data.result.filter(res => res != null)
+      data = _data.result.filter((res) => res != null)
     }
 
-    cache.set<FetchResult[]>(resultIds, data, Cache.deriveTtl(...RATE_LIMIT_RULES.SEARCH, ...RATE_LIMIT_RULES.FETCH))
+    cache.set<FetchResult[]>(
+      resultIds,
+      data,
+      Cache.deriveTtl(...RATE_LIMIT_RULES.SEARCH, ...RATE_LIMIT_RULES.FETCH)
+    )
   }
 
-  return data.map<PricingResult>(result => {
+  return data.map<PricingResult>((result) => {
     return {
       id: result.id,
-      itemLevel: result.item.properties?.find(prop => prop.type === 78)?.values[0][0] ?? String(result.item.ilvl),
+      itemLevel:
+        result.item.properties?.find((prop) => prop.type === 78)
+          ?.values[0][0] ?? String(result.item.ilvl),
       stackSize: result.item.stackSize,
       corrupted: result.item.corrupted,
-      quality: result.item.properties?.find(prop => prop.type === 6)?.values[0][0],
-      level: result.item.properties?.find(prop => prop.type === 5)?.values[0][0],
-      relativeDate: DateTime.fromISO(result.listing.indexed).toRelative({ style: 'short' }) ?? '',
+      quality: result.item.properties?.find((prop) => prop.type === 6)
+        ?.values[0][0],
+      level: result.item.properties?.find((prop) => prop.type === 5)
+        ?.values[0][0],
+      relativeDate:
+        DateTime.fromISO(result.listing.indexed).toRelative({
+          style: 'short'
+        }) ?? '',
       priceAmount: result.listing.price?.amount ?? 0,
       priceCurrency: result.listing.price?.currency ?? 'no price',
       hasNote: result.item.note != null,
       hasFee: result.listing.fee != null,
-      isMine: (result.listing.account.name === opts.accountName),
+      isMine: result.listing.account.name === opts.accountName,
       ign: result.listing.account.lastCharacterName,
       accountName: result.listing.account.name,
-      accountStatus: (result.listing.fee != null)
-        ? 'online'
-        : result.listing.account.online
-          ? (result.listing.account.online.status === 'afk' ? 'afk' : 'online')
-          : 'offline'
+      accountStatus:
+        result.listing.fee != null
+          ? 'online'
+          : result.listing.account.online
+            ? result.listing.account.online.status === 'afk'
+              ? 'afk'
+              : 'online'
+            : 'offline'
     }
   })
 }
@@ -647,17 +1023,23 @@ function getMinMax (roll: StatFilter['roll'], divisor: number) {
   }
 
   const sign = roll.tradeInvert ? -1 : 1
-  const a = typeof roll.min === 'number' ? roll.min * sign / divisor : undefined
-  const b = typeof roll.max === 'number' ? roll.max * sign / divisor : undefined
+  const a =
+    typeof roll.min === 'number' ? (roll.min * sign) / divisor : undefined
+  const b =
+    typeof roll.max === 'number' ? (roll.max * sign) / divisor : undefined
 
   return !roll.tradeInvert ? { min: a, max: b } : { min: b, max: a }
 }
 
-function tradeIdToQuery (id: string, stat: Pick<StatFilter, 'roll' | 'option' | 'disabled'>) {
+function tradeIdToQuery (
+  id: string,
+  stat: Pick<StatFilter, 'roll' | 'option' | 'disabled'>
+) {
   let roll = stat.roll
 
   const divMinMax = id.startsWith('{div_by_100}') ? 100 : 1
-  if (id.startsWith('{empty}') ||
+  if (
+    id.startsWith('{empty}') ||
     (id.startsWith('{empty_if_100}') && roll?.value === 100)
   ) {
     roll = undefined
@@ -670,9 +1052,7 @@ function tradeIdToQuery (id: string, stat: Pick<StatFilter, 'roll' | 'option' | 
     id,
     value: {
       ...getMinMax(roll, divMinMax),
-      option: stat.option != null
-        ? stat.option.value
-        : undefined
+      option: stat.option != null ? stat.option.value : undefined
     },
     disabled: stat.disabled
   }

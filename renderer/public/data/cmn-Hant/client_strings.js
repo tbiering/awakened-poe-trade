@@ -105,6 +105,15 @@ export default {
   UNMODIFIABLE: '不可調整的',
   FOULBORN_NAME: /^穢生 (.*)$/,
   FOULBORN_MODIFIER: 'Foulborn Unique Modifier',
+  INSCRIBED_ULTIMATUM_CHALLENGE: /^Challenge: (.*)$/,
+  INSCRIBED_ULTIMATUM_SACRIFICE:
+    /^Requires Sacrifice: (?<item>.*?)(?: x(?<quantity>\d+))?$/,
+  INSCRIBED_ULTIMATUM_REWARD: /^Reward: (.*)$/,
+  INSCRIBED_ULTIMATUM_TIER: /^(\d+)% more Monster Life$/,
+  INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY: /^Doubles sacrificed Currency$/,
+  INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS:
+    /^Doubles sacrificed Divination Cards$/,
+  INSCRIBED_ULTIMATUM_REWARD_MIRRORED_COPY: /^Item and Mirrored Copy$/,
   // ---
   CHAT_SYSTEM: /^: (?<body>.+)$/,
   CHAT_TRADE: /^\$(?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,

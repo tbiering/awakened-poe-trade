@@ -7,7 +7,7 @@ export enum ItemRarity {
   Normal = 'Normal',
   Magic = 'Magic',
   Rare = 'Rare',
-  Unique = 'Unique'
+  Unique = 'Unique',
 }
 
 export enum ItemInfluence {
@@ -16,7 +16,7 @@ export enum ItemInfluence {
   Hunter = 'Hunter',
   Redeemer = 'Redeemer',
   Shaper = 'Shaper',
-  Warlord = 'Warlord'
+  Warlord = 'Warlord',
 }
 
 export interface ParsedItem {
@@ -76,6 +76,14 @@ export interface ParsedItem {
     wingsRevealed?: number
     target?: 'Enchants' | 'Trinkets' | 'Gems' | 'Replicas'
   }
+  inscribedUltimatum?: {
+    challenge: string
+    reward_unique: string
+    reward_type: UltimatumRewardType
+    sacrifice: string
+    sacrifice_quantity: number
+    tier: number
+  }
   category?: ItemCategory
   info: BaseType
   rawText: string
@@ -84,7 +92,14 @@ export interface ParsedItem {
 // NOTE: should match option values on trade
 export enum IncursionRoom {
   Open = 1,
-  Obstructed = 2
+  Obstructed = 2,
+}
+
+export enum UltimatumRewardType {
+  Currency = 'currency',
+  DivinationCard = 'divination_card',
+  MirroredCopy = 'mirrored_copy',
+  Unique = 'unique',
 }
 
 export function createVirtualItem (

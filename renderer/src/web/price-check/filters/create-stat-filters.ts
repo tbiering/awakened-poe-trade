@@ -1,11 +1,20 @@
 import { ParsedItem, ItemRarity, ItemCategory } from '@/parser'
-import { ModifierType, StatCalculated, statSourcesTotal, translateStatWithRoll } from '@/parser/modifiers'
+import {
+  ModifierType,
+  StatCalculated,
+  statSourcesTotal,
+  translateStatWithRoll
+} from '@/parser/modifiers'
 import { percentRoll, percentRollDelta, roundRoll } from './util'
 import { FilterTag, ItemHasEmptyModifier, StatFilter } from './interfaces'
 import { filterPseudo } from './pseudo'
 import { applyRules as applyAtzoatlRules } from './pseudo/atzoatl-rules'
 import { applyRules as applyMirroredTabletRules } from './pseudo/reflection-rules'
-import { filterItemProp, filterBasePercentile, filterMemoryStrands } from './pseudo/item-property'
+import {
+  filterItemProp,
+  filterBasePercentile,
+  filterMemoryStrands
+} from './pseudo/item-property'
 import { mapProps } from './pseudo/maps'
 import { decodeOils, applyAnointmentRules } from './pseudo/anointments'
 import { StatBetter, CLIENT_STRINGS } from '@/assets/data'
@@ -22,17 +31,19 @@ export function createExactStatFilters (
   statsByType: StatCalculated[],
   opts: { searchStatRange: number }
 ): StatFilter[] {
-  if (
-    item.mapBlighted ||
-    item.category === ItemCategory.Invitation
-  ) return []
+  if (item.mapBlighted || item.category === ItemCategory.Invitation) return []
   if (
     item.isUnidentified &&
     item.rarity === ItemRarity.Unique &&
     !item.isSynthesised
-  ) return []
+  ) { return [] }
 
-  const keepByType = [ModifierType.Pseudo, ModifierType.Fractured, ModifierType.Enchant, ModifierType.Necropolis]
+  const keepByType = [
+    ModifierType.Pseudo,
+    ModifierType.Fractured,
+    ModifierType.Enchant,
+    ModifierType.Necropolis
+  ]
 
   if (
     !item.influences.length &&
@@ -43,15 +54,25 @@ export function createExactStatFilters (
     keepByType.push(ModifierType.Implicit)
   }
 
-  if (item.rarity === ItemRarity.Magic && (
+  if (
+    item.rarity === ItemRarity.Magic &&
     item.category !== ItemCategory.ClusterJewel &&
     item.category !== ItemCategory.Map &&
     item.category !== ItemCategory.HeistContract &&
     item.category !== ItemCategory.HeistBlueprint &&
     item.category !== ItemCategory.Sentinel
-  )) {
+  ) {
     keepByType.push(ModifierType.Explicit)
-  } else if (item.rarity === ItemRarity.Rare && item.category === ItemCategory.Idol) {
+  } else if (
+    item.rarity === ItemRarity.Rare &&
+    item.category === ItemCategory.Idol
+  ) {
+    keepByType.push(ModifierType.Explicit)
+  } else if (
+    item.category === ItemCategory.Currency &&
+    item.inscribedUltimatum
+  ) {
+    // Enable explicit modifiers for Inscribed Ultimatum items
     keepByType.push(ModifierType.Explicit)
   }
 
@@ -61,11 +82,12 @@ export function createExactStatFilters (
 
   const ctx: FiltersCreationContext = {
     item,
-    searchInRange: (item.category !== ItemCategory.Map)
-      ? Math.min(2, opts.searchStatRange)
-      : opts.searchStatRange,
+    searchInRange:
+      item.category !== ItemCategory.Map
+        ? Math.min(2, opts.searchStatRange)
+        : opts.searchStatRange,
     filters: [],
-    statsByType: statsByType.filter(calc => keepByType.includes(calc.type))
+    statsByType: statsByType.filter((calc) => keepByType.includes(calc.type))
   }
 
   filterBasePercentile(ctx)
@@ -73,7 +95,9 @@ export function createExactStatFilters (
   mapProps(ctx)
 
   ctx.filters.push(
-    ...ctx.statsByType.map(mod => calculatedStatToFilter(mod, ctx.searchInRange, item))
+    ...ctx.statsByType.map((mod) =>
+      calculatedStatToFilter(mod, ctx.searchInRange, item)
+    )
   )
 
   if (item.info.refName === 'Chronicle of Atzoatl') {
@@ -86,7 +110,10 @@ export function createExactStatFilters (
   }
   if (item.category === ItemCategory.Map) {
     for (const filter of ctx.filters) {
-      if (filter.tag !== FilterTag.Property && filter.tag !== FilterTag.Pseudo) {
+      if (
+        filter.tag !== FilterTag.Property &&
+        filter.tag !== FilterTag.Pseudo
+      ) {
         filter.disabled = false
       }
     }
@@ -97,10 +124,19 @@ export function createExactStatFilters (
     filter.hidden = undefined
 
     if (filter.tag === FilterTag.Explicit) {
-      filter.disabled = !filter.sources.some(source =>
-        source.modifier.info.tier != null &&
-        source.modifier.info.tier <= 2
-      )
+      // Enable Inscribed Ultimatum monster life stat by default
+      if (
+        item.category === ItemCategory.Currency &&
+        item.inscribedUltimatum &&
+        filter.statRef === '#% more Monster Life'
+      ) {
+        filter.disabled = false
+      } else {
+        filter.disabled = !filter.sources.some(
+          (source) =>
+            source.modifier.info.tier != null && source.modifier.info.tier <= 2
+        )
+      }
     } else if (filter.tag !== FilterTag.Property) {
       filter.disabled = false
     }
@@ -126,6 +162,72 @@ export function createExactStatFilters (
     enableGoodRolledFilters(ctx.filters, 0.66)
   }
 
+  // Add Inscribed Ultimatum pseudo stats
+  if (item.category === ItemCategory.Currency && item.inscribedUltimatum) {
+    const { challenge, reward_type, sacrifice, reward_unique } =
+      item.inscribedUltimatum
+
+    if (challenge) {
+      ctx.filters.push({
+        tradeId: ['ultimatum.challenge'],
+        text: `Challenge: ${challenge}`,
+        statRef: `ultimatum.challenge.${challenge}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    if (reward_type) {
+      const rewardText = reward_type
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(' ')
+      ctx.filters.push({
+        tradeId: ['ultimatum.reward'],
+        text: `Reward: ${rewardText}`,
+        statRef: `ultimatum.reward.${reward_type}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    if (sacrifice) {
+      ctx.filters.push({
+        tradeId: ['ultimatum.input'],
+        text: `Sacrifice: ${sacrifice}`,
+        statRef: `ultimatum.input.${sacrifice}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    if (reward_unique) {
+      ctx.filters.push({
+        tradeId: ['ultimatum.output'],
+        text: `Reward: ${reward_unique}`,
+        statRef: `ultimatum.output.${reward_unique}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    // Move monster health stat to the end
+    const monsterHealthIndex = ctx.filters.findIndex(
+      (f) => f.statRef === '#% more Monster Life'
+    )
+    if (monsterHealthIndex !== -1) {
+      const monsterHealthFilter = ctx.filters.splice(monsterHealthIndex, 1)[0]
+      ctx.filters.push(monsterHealthFilter)
+    }
+  }
+
   return ctx.filters
 }
 
@@ -138,9 +240,13 @@ export function initUiModFilters (
   const ctx: FiltersCreationContext = {
     item,
     filters: [],
-    searchInRange: (item.rarity === ItemRarity.Normal) ? 100 : opts.searchStatRange,
-    statsByType: item.statsByType.map(calc => {
-      if (calc.type === ModifierType.Fractured && calc.stat.trade.ids[ModifierType.Explicit]) {
+    searchInRange:
+      item.rarity === ItemRarity.Normal ? 100 : opts.searchStatRange,
+    statsByType: item.statsByType.map((calc) => {
+      if (
+        calc.type === ModifierType.Fractured &&
+        calc.stat.trade.ids[ModifierType.Explicit]
+      ) {
         return { ...calc, type: ModifierType.Explicit }
       } else {
         return calc
@@ -158,20 +264,38 @@ export function initUiModFilters (
   }
 
   if (!item.isCorrupted && !item.isMirrored) {
-    ctx.statsByType = ctx.statsByType.filter(mod => mod.type !== ModifierType.Fractured)
-    ctx.statsByType.push(...item.statsByType.filter(mod => mod.type === ModifierType.Fractured))
+    ctx.statsByType = ctx.statsByType.filter(
+      (mod) => mod.type !== ModifierType.Fractured
+    )
+    ctx.statsByType.push(
+      ...item.statsByType.filter((mod) => mod.type === ModifierType.Fractured)
+    )
   }
 
   if (item.isVeiled) {
-    ctx.statsByType = ctx.statsByType.filter(mod => mod.type !== ModifierType.Veiled)
+    ctx.statsByType = ctx.statsByType.filter(
+      (mod) => mod.type !== ModifierType.Veiled
+    )
   }
 
   ctx.filters.push(
-    ...ctx.statsByType.map(mod => calculatedStatToFilter(mod, ctx.searchInRange, item))
+    ...ctx.statsByType.map((mod) =>
+      calculatedStatToFilter(mod, ctx.searchInRange, item)
+    )
   )
 
   if (item.isVeiled) {
-    ctx.filters.forEach(filter => { filter.disabled = true })
+    ctx.filters.forEach((filter) => {
+      // Don't disable Inscribed Ultimatum monster life stat
+      if (
+        item.category === ItemCategory.Currency &&
+        item.inscribedUltimatum &&
+        filter.statRef === '#% more Monster Life'
+      ) {
+        return
+      }
+      filter.disabled = true
+    })
   }
 
   finalFilterTweaks(ctx)
@@ -192,11 +316,10 @@ export function calculatedStatToFilter (
       tradeId: stat.trade.ids[type],
       statRef: stat.ref,
       text: sources[0].stat.translation.string,
-      tag: (type === ModifierType.Enchant)
-        ? FilterTag.Enchant
-        : FilterTag.Variant,
+      tag:
+        type === ModifierType.Enchant ? FilterTag.Enchant : FilterTag.Variant,
       oils: decodeOils(calc),
-      sources: sources,
+      sources,
       option: {
         value: sources[0].contributes!.value
       },
@@ -206,7 +329,7 @@ export function calculatedStatToFilter (
 
   const roll = statSourcesTotal(
     calc.sources,
-    (item.info.refName === 'Mirrored Tablet') ? 'max' : 'sum'
+    item.info.refName === 'Mirrored Tablet' ? 'max' : 'sum'
   )
   const translation = translateStatWithRoll(calc, roll)
 
@@ -214,17 +337,17 @@ export function calculatedStatToFilter (
     tradeId: stat.trade.ids[type],
     statRef: stat.ref,
     text: translation.string,
-    tag: (type as unknown) as FilterTag,
+    tag: type as unknown as FilterTag,
     oils: decodeOils(calc),
-    sources: sources,
+    sources,
     roll: undefined,
     disabled: true
   }
 
   if (type === ModifierType.Implicit) {
-    if (sources.some(s => s.modifier.info.generation === 'corrupted')) {
+    if (sources.some((s) => s.modifier.info.generation === 'corrupted')) {
       filter.tag = FilterTag.Corrupted
-    } else if (sources.some(s => s.modifier.info.generation === 'eldritch')) {
+    } else if (sources.some((s) => s.modifier.info.generation === 'eldritch')) {
       filter.tag = FilterTag.Eldritch
     } else if (item.isSynthesised) {
       filter.tag = FilterTag.Synthesised
@@ -235,44 +358,87 @@ export function calculatedStatToFilter (
       if (!fixedStats.includes(filter.statRef)) {
         filter.tag = FilterTag.Variant
       }
-    } else if (sources.some(s => s.modifier.info.generation === 'foulborn')) {
+    } else if (sources.some((s) => s.modifier.info.generation === 'foulborn')) {
       filter.tag = FilterTag.Foulborn
-    } else if (sources.some(s => CLIENT_STRINGS.SHAPER_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.SHAPER_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Shaper
-    } else if (sources.some(s => CLIENT_STRINGS.ELDER_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.ELDER_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Elder
-    } else if (sources.some(s => CLIENT_STRINGS.HUNTER_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.HUNTER_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Hunter
-    } else if (sources.some(s => CLIENT_STRINGS.WARLORD_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.WARLORD_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Warlord
-    } else if (sources.some(s => CLIENT_STRINGS.REDEEMER_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.REDEEMER_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Redeemer
-    } else if (sources.some(s => CLIENT_STRINGS.CRUSADER_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.CRUSADER_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Crusader
-    } else if (sources.some(s => CLIENT_STRINGS.DELVE_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.DELVE_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Delve
-    } else if (sources.some(s => CLIENT_STRINGS.VEILED_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.VEILED_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       // can't drop from ground, so don't show
       // filter.tag = FilterTag.Unveiled
-    } else if (sources.some(s => CLIENT_STRINGS.INCURSION_MODS.includes(s.modifier.info.name!))) {
+    } else if (
+      sources.some((s) =>
+        CLIENT_STRINGS.INCURSION_MODS.includes(s.modifier.info.name!)
+      )
+    ) {
       filter.tag = FilterTag.Incursion
     }
   }
 
   if (roll && !filter.option) {
-    if (item.rarity === ItemRarity.Magic && (
-      item.isUnmodifiable || item.isCorrupted || item.isMirrored
-    )) {
+    if (
+      item.rarity === ItemRarity.Magic &&
+      (item.isUnmodifiable || item.isCorrupted || item.isMirrored)
+    ) {
       percent = 0
     } else if (
       item.rarity === ItemRarity.Unique ||
-      (item.rarity === ItemRarity.Magic && item.category === ItemCategory.Jewel) ||
-      calc.sources.some(({ modifier }) => modifier.info.tier === 1 && modifier.info.type === ModifierType.Fractured)
-    ) {
-      const perfectRoll = (
-        (calc.stat.better === StatBetter.PositiveRoll && roll.value >= roll.max) ||
-        (calc.stat.better === StatBetter.NegativeRoll && roll.value <= roll.min)
+      (item.rarity === ItemRarity.Magic &&
+        item.category === ItemCategory.Jewel) ||
+      calc.sources.some(
+        ({ modifier }) =>
+          modifier.info.tier === 1 &&
+          modifier.info.type === ModifierType.Fractured
       )
+    ) {
+      const perfectRoll =
+        (calc.stat.better === StatBetter.PositiveRoll &&
+          roll.value >= roll.max) ||
+        (calc.stat.better === StatBetter.NegativeRoll &&
+          roll.value <= roll.min)
       if (perfectRoll) {
         percent = 0
       }
@@ -291,20 +457,35 @@ export function calculatedStatToFilter (
     }
 
     const dp =
-    calc.stat.dp ||
-    calc.sources.some(s => s.stat.stat.ref === calc.stat.ref && s.stat.roll!.dp)
+      calc.stat.dp ||
+      calc.sources.some(
+        (s) => s.stat.stat.ref === calc.stat.ref && s.stat.roll!.dp
+      )
 
     const filterBounds = {
       min: percentRoll(roll.min, -0, Math.floor, dp),
       max: percentRoll(roll.max, +0, Math.ceil, dp)
     }
 
-    const filterDefault = (calc.stat.better === StatBetter.NotComparable)
-      ? { min: roll.value, max: roll.value }
-      : (item.rarity === ItemRarity.Unique)
+    const filterDefault =
+      calc.stat.better === StatBetter.NotComparable
+        ? { min: roll.value, max: roll.value }
+        : item.rarity === ItemRarity.Unique
           ? {
-              min: percentRollDelta(roll.value, (roll.max - roll.min), -percent, Math.floor, dp),
-              max: percentRollDelta(roll.value, (roll.max - roll.min), +percent, Math.ceil, dp)
+              min: percentRollDelta(
+                roll.value,
+                roll.max - roll.min,
+                -percent,
+                Math.floor,
+                dp
+              ),
+              max: percentRollDelta(
+                roll.value,
+                roll.max - roll.min,
+                +percent,
+                Math.ceil,
+                dp
+              )
             }
           : {
               min: percentRoll(roll.value, -percent, Math.floor, dp),
@@ -318,10 +499,13 @@ export function calculatedStatToFilter (
       min: undefined,
       max: undefined,
       default: filterDefault,
-      bounds: (item.rarity === ItemRarity.Unique && roll.min !== roll.max && calc.stat.better !== StatBetter.NotComparable)
-        ? filterBounds
-        : undefined,
-      dp: dp,
+      bounds:
+        item.rarity === ItemRarity.Unique &&
+        roll.min !== roll.max &&
+        calc.stat.better !== StatBetter.NotComparable
+          ? filterBounds
+          : undefined,
+      dp,
       isNegated: false,
       tradeInvert: calc.stat.trade.inverted,
       goodness
@@ -341,13 +525,18 @@ export function calculatedStatToFilter (
 
 function hideNotVariableStat (filter: StatFilter, item: ParsedItem) {
   if (item.rarity !== ItemRarity.Unique) return
-  if (filter.tag === FilterTag.Implicit &&
-    item.category === ItemCategory.Jewel) return
+  if (filter.tag === FilterTag.Implicit && item.category === ItemCategory.Jewel) { return }
   if (
     filter.tag !== FilterTag.Implicit &&
     filter.tag !== FilterTag.Explicit &&
     filter.tag !== FilterTag.Pseudo
-  ) return
+  ) { return }
+  // Don't hide Inscribed Ultimatum monster life stat
+  if (
+    item.category === ItemCategory.Currency &&
+    item.inscribedUltimatum &&
+    filter.statRef === '#% more Monster Life'
+  ) { return }
 
   if (!filter.roll) {
     filter.hidden = 'filters.hide_const_roll'
@@ -376,9 +565,7 @@ function filterFillMinMax (
   }
 }
 
-function filterAdjustmentForNegate (
-  roll: NonNullable<StatFilter['roll']>
-) {
+function filterAdjustmentForNegate (roll: NonNullable<StatFilter['roll']>) {
   roll.tradeInvert = !roll.tradeInvert
   roll.isNegated = true
   const swap = JSON.parse(JSON.stringify(roll)) as typeof roll
@@ -392,18 +579,17 @@ function filterAdjustmentForNegate (
   roll.default.max = -1 * swap.default.min
 
   roll.value = -1 * swap.value
-  roll.min = (typeof swap.max === 'number')
-    ? -1 * swap.max
-    : undefined
-  roll.max = (typeof swap.min === 'number')
-    ? -1 * swap.min
-    : undefined
+  roll.min = typeof swap.max === 'number' ? -1 * swap.max : undefined
+  roll.max = typeof swap.min === 'number' ? -1 * swap.min : undefined
 }
 
 function finalFilterTweaks (ctx: FiltersCreationContext) {
   const { item } = ctx
 
-  if (item.category === ItemCategory.ClusterJewel && item.rarity !== ItemRarity.Unique) {
+  if (
+    item.category === ItemCategory.ClusterJewel &&
+    item.rarity !== ItemRarity.Unique
+  ) {
     applyClusterJewelRules(ctx.filters)
   } else if (item.category === ItemCategory.Flask) {
     applyFlaskRules(ctx.filters)
@@ -425,24 +611,101 @@ function finalFilterTweaks (ctx: FiltersCreationContext) {
     })
   }
 
-  if (item.category === ItemCategory.Amulet || item.category === ItemCategory.Ring) {
+  if (
+    item.category === ItemCategory.Amulet ||
+    item.category === ItemCategory.Ring
+  ) {
     applyAnointmentRules(ctx.filters, ctx.item)
+  }
+
+  // Add Inscribed Ultimatum pseudo stats
+  if (item.category === ItemCategory.Currency && item.inscribedUltimatum) {
+    const { challenge, reward_type, sacrifice, reward_unique } =
+      item.inscribedUltimatum
+
+    if (challenge) {
+      ctx.filters.push({
+        tradeId: ['ultimatum.challenge'],
+        text: `Challenge: ${challenge}`,
+        statRef: `ultimatum.challenge.${challenge}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    if (reward_type) {
+      const rewardText = reward_type
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(' ')
+      ctx.filters.push({
+        tradeId: ['ultimatum.reward'],
+        text: `Reward: ${rewardText}`,
+        statRef: `ultimatum.reward.${reward_type}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    if (sacrifice) {
+      ctx.filters.push({
+        tradeId: ['ultimatum.input'],
+        text: `Sacrifice: ${sacrifice}`,
+        statRef: `ultimatum.input.${sacrifice}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    if (reward_unique) {
+      ctx.filters.push({
+        tradeId: ['ultimatum.output'],
+        text: `Reward: ${reward_unique}`,
+        statRef: `ultimatum.output.${reward_unique}`,
+        disabled: false,
+        tag: FilterTag.Pseudo,
+        sources: []
+      })
+    }
+
+    // Move monster health stat to the end
+    const monsterHealthIndex = ctx.filters.findIndex(
+      (f) => f.statRef === '#% more Monster Life'
+    )
+    if (monsterHealthIndex !== -1) {
+      const monsterHealthFilter = ctx.filters.splice(monsterHealthIndex, 1)[0]
+      ctx.filters.push(monsterHealthFilter)
+    }
   }
 
   for (const filter of ctx.filters) {
     if (filter.tag === FilterTag.Fractured) {
-      const mod = ctx.item.statsByType.find(mod => mod.stat.ref === filter.statRef)!
+      const mod = ctx.item.statsByType.find(
+        (mod) => mod.stat.ref === filter.statRef
+      )!
       if (mod.stat.trade.ids[ModifierType.Explicit]) {
         // hide only if fractured mod has corresponding explicit variant
         filter.hidden = 'filters.hide_for_crafting'
       }
-    } else if (filter.tag === FilterTag.Foulborn || filter.tag === FilterTag.Variant) {
+    } else if (
+      filter.tag === FilterTag.Foulborn ||
+      filter.tag === FilterTag.Variant
+    ) {
       filter.disabled = false
     }
   }
 
   if (item.rarity === ItemRarity.Unique) {
-    const countVisible = ctx.filters.reduce((cnt, filter) => filter.hidden ? cnt : cnt + 1, 0)
+    const countVisible = ctx.filters.reduce(
+      (cnt, filter) => (filter.hidden ? cnt : cnt + 1),
+      0
+    )
     if (countVisible <= 3) {
       enableAllFilters(ctx.filters)
     }
@@ -463,10 +726,10 @@ function applyClusterJewelRules (filters: StatFilter[]) {
       // 4 is [_, 5]
       if (filter.roll!.value === 4) {
         filter.roll!.max = 5
-      // 5 is [5, 5]
+        // 5 is [5, 5]
       } else if (filter.roll!.value === 5) {
         filter.roll!.min = filter.roll!.default.min
-      // 3, 6, 10, 11, 12 are [n, _]
+        // 3, 6, 10, 11, 12 are [n, _]
       } else if (
         filter.roll!.value === 3 ||
         filter.roll!.value === 6 ||
@@ -483,7 +746,9 @@ function applyClusterJewelRules (filters: StatFilter[]) {
 }
 
 function applyFlaskRules (filters: StatFilter[]) {
-  const usedEnkindling = filters.find(filter => filter.statRef === 'Gains no Charges during Flask Effect')
+  const usedEnkindling = filters.find(
+    (filter) => filter.statRef === 'Gains no Charges during Flask Effect'
+  )
   for (const filter of filters) {
     if (filter.tag === FilterTag.Enchant && !usedEnkindling) {
       filter.hidden = 'hide_harvest_and_instilling'
@@ -495,29 +760,35 @@ function applyFlaskRules (filters: StatFilter[]) {
 // TODO
 // +1 Prefix Modifier allowed
 // -1 Suffix Modifier allowed
-function showHasEmptyModifier (ctx: FiltersCreationContext): ItemHasEmptyModifier | false {
+function showHasEmptyModifier (
+  ctx: FiltersCreationContext
+): ItemHasEmptyModifier | false {
   const { item } = ctx
 
-  if (
-    item.rarity !== ItemRarity.Rare ||
-    item.isCorrupted ||
-    item.isMirrored
-  ) return false
+  if (item.rarity !== ItemRarity.Rare || item.isCorrupted || item.isMirrored) { return false }
 
-  const randomMods = item.newMods.filter(mod =>
-    mod.info.type === ModifierType.Explicit ||
-    mod.info.type === ModifierType.Fractured ||
-    mod.info.type === ModifierType.Veiled ||
-    mod.info.type === ModifierType.Crafted)
+  const randomMods = item.newMods.filter(
+    (mod) =>
+      mod.info.type === ModifierType.Explicit ||
+      mod.info.type === ModifierType.Fractured ||
+      mod.info.type === ModifierType.Veiled ||
+      mod.info.type === ModifierType.Crafted
+  )
 
-  const craftedMod = randomMods.find(mod => mod.info.type === ModifierType.Crafted)
+  const craftedMod = randomMods.find(
+    (mod) => mod.info.type === ModifierType.Crafted
+  )
 
   if (
     (randomMods.length === 5 && !craftedMod) ||
     (randomMods.length === 6 && craftedMod)
   ) {
-    let prefixes = randomMods.filter(mod => mod.info.generation === 'prefix').length
-    let suffixes = randomMods.filter(mod => mod.info.generation === 'suffix').length
+    let prefixes = randomMods.filter(
+      (mod) => mod.info.generation === 'prefix'
+    ).length
+    let suffixes = randomMods.filter(
+      (mod) => mod.info.generation === 'suffix'
+    ).length
 
     if (craftedMod) {
       if (craftedMod.info.generation === 'prefix') {
