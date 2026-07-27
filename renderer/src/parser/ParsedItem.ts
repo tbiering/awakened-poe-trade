@@ -7,7 +7,7 @@ export enum ItemRarity {
   Normal = 'Normal',
   Magic = 'Magic',
   Rare = 'Rare',
-  Unique = 'Unique',
+  Unique = 'Unique'
 }
 
 export enum ItemInfluence {
@@ -16,7 +16,7 @@ export enum ItemInfluence {
   Hunter = 'Hunter',
   Redeemer = 'Redeemer',
   Shaper = 'Shaper',
-  Warlord = 'Warlord',
+  Warlord = 'Warlord'
 }
 
 export interface ParsedItem {
@@ -35,7 +35,7 @@ export interface ParsedItem {
   mapBlighted?: 'Blighted' | 'Blight-ravaged'
   mapCompletionReward?: string
   map?: {
-    tier: number
+    tier: number | undefined
     itemQuantity?: number
     itemRarity?: number
     packSize?: number
@@ -45,6 +45,7 @@ export interface ParsedItem {
     moreDivCards?: number
   }
   gemLevel?: number
+  imbuedGem?: boolean
   areaLevel?: number
   talismanTier?: number
   memoryStrands?: number
@@ -58,6 +59,7 @@ export interface ParsedItem {
   isCorrupted: boolean
   isUnmodifiable?: boolean
   isMirrored?: boolean
+  isSplit?: boolean
   influences: ItemInfluence[]
   logbookAreaMods?: ParsedModifier[][]
   sentinelCharge?: number
@@ -72,7 +74,7 @@ export interface ParsedItem {
     text: string
     type: ModifierType
   }>
-  heist?: {
+  heistBlueprint?: {
     wingsRevealed?: number
     target?: 'Enchants' | 'Trinkets' | 'Gems' | 'Replicas'
   }
@@ -84,6 +86,11 @@ export interface ParsedItem {
     sacrifice_quantity: number
     tier: number
   }
+  heistContract?: {
+    requiredJob?: 'Lockpicking' | 'Brute Force' | 'Perception' | 'Demolition' | 'Counter-Thaumaturgy' | 'Trap Disarmament' | 'Agility' | 'Deception' | 'Engineering'
+    jobLevel?: number
+    targetValue?: 'Priceless'
+  }
   category?: ItemCategory
   info: BaseType
   rawText: string
@@ -92,14 +99,14 @@ export interface ParsedItem {
 // NOTE: should match option values on trade
 export enum IncursionRoom {
   Open = 1,
-  Obstructed = 2,
+  Obstructed = 2
 }
 
 export enum UltimatumRewardType {
   Currency = 'currency',
   DivinationCard = 'divination_card',
   MirroredCopy = 'mirrored_copy',
-  Unique = 'unique',
+  Unique = 'unique'
 }
 
 export function createVirtualItem (
