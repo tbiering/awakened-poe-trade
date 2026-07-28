@@ -103,6 +103,7 @@ export interface StatFilter {
   text: string
   tag: FilterTag
   oils?: string[]
+  ultimatum?: { option: string }
   sources: StatCalculated['sources']
   not?: true
   roll?: {

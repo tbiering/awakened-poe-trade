@@ -80,10 +80,10 @@ export interface ParsedItem {
   }
   inscribedUltimatum?: {
     challenge: string
-    reward_unique: string
-    reward_type: UltimatumRewardType
+    rewardUnique: string
+    rewardType: UltimatumRewardType
     sacrifice: string
-    sacrifice_quantity: number
+    sacrificeQuantity: number
     tier: number
   }
   heistContract?: {

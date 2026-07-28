@@ -1,7 +1,7 @@
-import { ParsedItem, ItemRarity, ItemCategory } from '@/parser'
+import { ParsedItem, ItemRarity, ItemCategory, UltimatumRewardType } from '@/parser'
 import { ModifierType, StatCalculated, statSourcesTotal, translateStatWithRoll } from '@/parser/modifiers'
 import { percentRoll, percentRollDelta, roundRoll } from './util'
-import { FilterTag, ItemHasEmptyModifier, StatFilter } from './interfaces'
+import { FilterTag, InternalTradeId, ItemHasEmptyModifier, StatFilter } from './interfaces'
 import { filterPseudo } from './pseudo'
 import { applyRules as applyAtzoatlRules } from './pseudo/atzoatl-rules'
 import { applyRules as applyMirroredTabletRules } from './pseudo/reflection-rules'
@@ -17,6 +17,50 @@ export interface FiltersCreationContext {
   readonly searchInRange: number
   filters: StatFilter[]
   statsByType: StatCalculated[]
+}
+
+const MONSTER_LIFE_STAT_REF = '#% more Monster Life'
+
+const ULTIMATUM_REWARD_LABEL: Record<UltimatumRewardType, string> = {
+  [UltimatumRewardType.Currency]: 'Currency',
+  [UltimatumRewardType.DivinationCard]: 'Divination Card',
+  [UltimatumRewardType.MirroredCopy]: 'Mirrored Copy',
+  [UltimatumRewardType.Unique]: 'Unique'
+}
+
+function createUltimatumFilters (item: ParsedItem): StatFilter[] {
+  const ultimatum = item.inscribedUltimatum
+  if (item.category !== ItemCategory.Currency || !ultimatum) return []
+
+  const filters: StatFilter[] = []
+  function push (tradeId: InternalTradeId, text: string, option: string) {
+    filters.push({
+      tradeId: [tradeId],
+      statRef: tradeId,
+      text,
+      ultimatum: { option },
+      disabled: false,
+      tag: FilterTag.Pseudo,
+      sources: []
+    })
+  }
+
+  if (ultimatum.challenge) {
+    push('ultimatum.challenge', `Challenge: ${ultimatum.challenge}`, ultimatum.challenge)
+  }
+  if (ultimatum.rewardType) {
+    push('ultimatum.reward', `Reward: ${ULTIMATUM_REWARD_LABEL[ultimatum.rewardType]}`, ultimatum.rewardType)
+  }
+  // trade site only knows uniques/cards/currency as input, a mirrored
+  // item's sacrifice is an arbitrary rare and gets rejected with 400
+  if (ultimatum.sacrifice && ultimatum.rewardType !== UltimatumRewardType.MirroredCopy) {
+    push('ultimatum.input', `Sacrifice: ${ultimatum.sacrifice}`, ultimatum.sacrifice)
+  }
+  if (ultimatum.rewardUnique) {
+    push('ultimatum.output', `Reward: ${ultimatum.rewardUnique}`, ultimatum.rewardUnique)
+  }
+
+  return filters
 }
 
 export function createExactStatFilters (
@@ -107,7 +151,7 @@ export function createExactStatFilters (
       if (
         item.category === ItemCategory.Currency &&
         item.inscribedUltimatum &&
-        filter.statRef === '#% more Monster Life'
+        filter.statRef === MONSTER_LIFE_STAT_REF
       ) {
         filter.disabled = false
       } else {
@@ -147,64 +191,14 @@ export function createExactStatFilters (
     enableGoodRolledFilters(ctx.filters, 0.66)
   }
 
-  // Add Inscribed Ultimatum pseudo stats
-  if (item.category === ItemCategory.Currency && item.inscribedUltimatum) {
-    const { challenge, reward_type: rewardType, sacrifice, reward_unique: rewardUnique } = item.inscribedUltimatum
+  const ultimatumFilters = createUltimatumFilters(item)
+  if (ultimatumFilters.length) {
+    ctx.filters.push(...ultimatumFilters)
 
-    if (challenge) {
-      ctx.filters.push({
-        tradeId: ['ultimatum.challenge'],
-        text: `Challenge: ${challenge}`,
-        statRef: `ultimatum.challenge.${challenge}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    if (rewardType) {
-      const rewardText = rewardType
-        .replace(/_/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ')
-      ctx.filters.push({
-        tradeId: ['ultimatum.reward'],
-        text: `Reward: ${rewardText}`,
-        statRef: `ultimatum.reward.${rewardType}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    if (sacrifice) {
-      ctx.filters.push({
-        tradeId: ['ultimatum.input'],
-        text: `Sacrifice: ${sacrifice}`,
-        statRef: `ultimatum.input.${sacrifice}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    if (rewardUnique) {
-      ctx.filters.push({
-        tradeId: ['ultimatum.output'],
-        text: `Reward: ${rewardUnique}`,
-        statRef: `ultimatum.output.${rewardUnique}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    // Move monster health stat to the end
-    const monsterHealthIndex = ctx.filters.findIndex(f => f.statRef === '#% more Monster Life')
-    if (monsterHealthIndex !== -1) {
-      const monsterHealthFilter = ctx.filters.splice(monsterHealthIndex, 1)[0]
-      ctx.filters.push(monsterHealthFilter)
+    // keep monster life (the tier indicator) last, after the ultimatum pseudo stats
+    const monsterLifeIndex = ctx.filters.findIndex(f => f.statRef === MONSTER_LIFE_STAT_REF)
+    if (monsterLifeIndex !== -1) {
+      ctx.filters.push(...ctx.filters.splice(monsterLifeIndex, 1))
     }
   }
 
@@ -253,17 +247,7 @@ export function initUiModFilters (
   )
 
   if (item.isVeiled) {
-    ctx.filters.forEach(filter => {
-      // Don't disable Inscribed Ultimatum monster life stat
-      if (
-        item.category === ItemCategory.Currency &&
-        item.inscribedUltimatum &&
-        filter.statRef === '#% more Monster Life'
-      ) {
-        return
-      }
-      filter.disabled = true
-    })
+    ctx.filters.forEach(filter => { filter.disabled = true })
   }
 
   finalFilterTweaks(ctx)
@@ -450,12 +434,6 @@ function hideNotVariableStat (filter: StatFilter, item: ParsedItem) {
     filter.tag !== FilterTag.Explicit &&
     filter.tag !== FilterTag.Pseudo
   ) return
-  // Don't hide Inscribed Ultimatum monster life stat
-  if (
-    item.category === ItemCategory.Currency &&
-    item.inscribedUltimatum &&
-    filter.statRef === '#% more Monster Life'
-  ) return
 
   if (!filter.roll) {
     filter.hidden = 'filters.hide_const_roll'
@@ -542,67 +520,6 @@ function finalFilterTweaks (ctx: FiltersCreationContext) {
 
   if (item.category === ItemCategory.Amulet || item.category === ItemCategory.Ring) {
     applyAnointmentRules(ctx.filters, ctx.item)
-  }
-
-  // Add Inscribed Ultimatum pseudo stats
-  if (item.category === ItemCategory.Currency && item.inscribedUltimatum) {
-    const { challenge, reward_type: rewardType, sacrifice, reward_unique: rewardUnique } = item.inscribedUltimatum
-
-    if (challenge) {
-      ctx.filters.push({
-        tradeId: ['ultimatum.challenge'],
-        text: `Challenge: ${challenge}`,
-        statRef: `ultimatum.challenge.${challenge}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    if (rewardType) {
-      const rewardText = rewardType
-        .replace(/_/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ')
-      ctx.filters.push({
-        tradeId: ['ultimatum.reward'],
-        text: `Reward: ${rewardText}`,
-        statRef: `ultimatum.reward.${rewardType}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    if (sacrifice) {
-      ctx.filters.push({
-        tradeId: ['ultimatum.input'],
-        text: `Sacrifice: ${sacrifice}`,
-        statRef: `ultimatum.input.${sacrifice}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    if (rewardUnique) {
-      ctx.filters.push({
-        tradeId: ['ultimatum.output'],
-        text: `Reward: ${rewardUnique}`,
-        statRef: `ultimatum.output.${rewardUnique}`,
-        disabled: false,
-        tag: FilterTag.Pseudo,
-        sources: []
-      })
-    }
-
-    // Move monster health stat to the end
-    const monsterHealthIndex = ctx.filters.findIndex(f => f.statRef === '#% more Monster Life')
-    if (monsterHealthIndex !== -1) {
-      const monsterHealthFilter = ctx.filters.splice(monsterHealthIndex, 1)[0]
-      ctx.filters.push(monsterHealthFilter)
-    }
   }
 
   for (const filter of ctx.filters) {

@@ -1,4 +1,4 @@
-import { ItemInfluence, ItemCategory } from '@/parser'
+import { ItemInfluence, ItemCategory, UltimatumRewardType } from '@/parser'
 import { ItemFilters, StatFilter, INTERNAL_TRADE_IDS, InternalTradeId } from '../filters/interfaces'
 import { setProperty as propSet } from 'dot-prop'
 import { DateTime } from 'luxon'
@@ -51,6 +51,23 @@ export const CATEGORY_TO_TRADE_ID = new Map([
   [ItemCategory.Charm, 'azmeri.charm'],
   [ItemCategory.Idol, 'idol'],
   [ItemCategory.Graft, 'graft']
+])
+
+// NOTE: keys are lowercased challenge texts, values are option ids
+// from `api/trade/data/filters` -> ultimatum_filters.ultimatum_challenge
+const ULTIMATUM_CHALLENGE_TO_TRADE = new Map([
+  ['survive', 'Survival'],
+  ['defeat waves of enemies', 'Exterminate'],
+  ['protect the altar', 'Defense'],
+  ['stand in the stone circles', 'Conquer']
+])
+
+// NOTE: should match option values on trade
+const ULTIMATUM_REWARD_TO_TRADE = new Map<string, string>([
+  [UltimatumRewardType.Currency, 'DoubleCurrency'],
+  [UltimatumRewardType.DivinationCard, 'DoubleDivCards'],
+  [UltimatumRewardType.MirroredCopy, 'MirrorRare'],
+  [UltimatumRewardType.Unique, 'ExchangeUnique']
 ])
 
 const TOTAL_MODS_TEXT = {
@@ -364,42 +381,37 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[]) {
     propSet(query.filters, 'misc_filters.filters.stack_size.min', filters.stackSize.value)
   }
 
-  // Handle Inscribed Ultimatum pseudo stats
-  const challengeMap: Record<string, string> = {
-    'Survive': 'Survival',
-    'Defeat waves of enemies': 'Exterminate',
-    'Protect the Altar': 'Defense',
-    'Stand in the Stone Circles': 'Conquer'
-  }
-  const rewardTypeMap: Record<string, string> = {
-    currency: 'DoubleCurrency',
-    divination_card: 'DoubleDivCards',
-    mirrored_copy: 'MirrorRare',
-    unique: 'ExchangeUnique'
-  }
-
+  // Inscribed Ultimatum pseudo stats
   let hasUltimatumFilters = false
   for (const stat of stats) {
-    if (stat.tradeId[0] === 'ultimatum.challenge' && !stat.disabled) {
-      const challengeValue = stat.statRef.replace('ultimatum.challenge.', '')
-      const mappedChallenge = challengeMap[challengeValue] || challengeValue
-      propSet(query.filters, 'ultimatum_filters.filters.ultimatum_challenge.option', mappedChallenge)
-      hasUltimatumFilters = true
-    } else if (stat.tradeId[0] === 'ultimatum.reward' && !stat.disabled) {
-      const rewardValue = stat.statRef.replace('ultimatum.reward.', '')
-      const rewardOption = rewardTypeMap[rewardValue]
-      if (rewardOption) {
-        propSet(query.filters, 'ultimatum_filters.filters.ultimatum_reward.option', rewardOption)
-        hasUltimatumFilters = true
+    if (stat.disabled || !stat.ultimatum) continue
+
+    const { option } = stat.ultimatum
+    switch (stat.tradeId[0]) {
+      case 'ultimatum.challenge': {
+        const challengeOption = ULTIMATUM_CHALLENGE_TO_TRADE.get(option.toLowerCase())
+        if (challengeOption) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_challenge.option', challengeOption)
+          hasUltimatumFilters = true
+        }
+        break
       }
-    } else if (stat.tradeId[0] === 'ultimatum.input' && !stat.disabled) {
-      const inputValue = stat.statRef.replace('ultimatum.input.', '')
-      propSet(query.filters, 'ultimatum_filters.filters.ultimatum_input.option', inputValue)
-      hasUltimatumFilters = true
-    } else if (stat.tradeId[0] === 'ultimatum.output' && !stat.disabled) {
-      const outputValue = stat.statRef.replace('ultimatum.output.', '')
-      propSet(query.filters, 'ultimatum_filters.filters.ultimatum_output.option', outputValue)
-      hasUltimatumFilters = true
+      case 'ultimatum.reward': {
+        const rewardOption = ULTIMATUM_REWARD_TO_TRADE.get(option)
+        if (rewardOption) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_reward.option', rewardOption)
+          hasUltimatumFilters = true
+        }
+        break
+      }
+      case 'ultimatum.input':
+        propSet(query.filters, 'ultimatum_filters.filters.ultimatum_input.option', option)
+        hasUltimatumFilters = true
+        break
+      case 'ultimatum.output':
+        propSet(query.filters, 'ultimatum_filters.filters.ultimatum_output.option', option)
+        hasUltimatumFilters = true
+        break
     }
   }
 

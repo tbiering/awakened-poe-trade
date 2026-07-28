@@ -50,6 +50,12 @@
         <ui-radio v-model="searchStatRange" :value="0">{{ t(':fill_roll_exact') }}</ui-radio>
       </div>
     </div>
+    <div class="mb-2">
+      <div class="flex-1 mb-1">{{ t(':ultimatum_fee') }}</div>
+      <div class="mb-4 flex">
+        <input v-model.number="ultimatumRewardFee" class="rounded bg-gray-900 px-1 block w-16 mb-1 font-poe text-center" />
+      </div>
+    </div>
     <!-- <ui-checkbox class="mb-4"
       v-model="rememberCurrency">{{ t(':remember_currency') }}</ui-checkbox> -->
     <ui-checkbox class="mb-4"
@@ -146,6 +152,16 @@ export default defineComponent({
           if (value >= 0 && value <= 50) {
             configWidget.value.searchStatRange = value
           }
+        }
+      }),
+      ultimatumRewardFee: computed<number>({
+        get () {
+          return configWidget.value.ultimatumRewardFee
+        },
+        set (value) {
+          if (typeof value !== 'number') return
+
+          configWidget.value.ultimatumRewardFee = Math.min(Math.max(value, 0), 1)
         }
       }),
       apiLatencySeconds: computed<number>({

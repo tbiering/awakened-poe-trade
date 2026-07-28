@@ -37,18 +37,15 @@ export interface StatGroup {
 export type StatOrGroup = Stat | StatGroup
 
 export type StatGroupResolver =
-  | {
+  {
     strat: 'select'
     test: Array<string | null>
-  }
-  | {
+  } | {
     strat: 'trivial-merge'
-  }
-  | {
+  } | {
     strat: 'percent-merge'
     kind: Array<'percent' | 'value'>
-  }
-  | {
+  } | {
     strat: 'flag-merge'
     kind: Array<'flag' | 'value'>
   }
@@ -61,7 +58,13 @@ export interface DropEntry {
 export interface BaseType {
   name: string
   refName: string
-  namespace: 'DIVINATION_CARD' | 'CAPTURED_BEAST' | 'UNIQUE' | 'ITEM' | 'GEM'
+  namespace: (
+    'DIVINATION_CARD' |
+    'CAPTURED_BEAST' |
+    'UNIQUE' |
+    'ITEM' |
+    'GEM'
+  )
   icon: string
   w?: number
   h?: number

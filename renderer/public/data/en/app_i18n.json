@@ -298,7 +298,9 @@
     "you_have": "You have",
     "stack": "Stack",
     "legacy_bulk_xchg_msg": "This item is available on the Currency Exchange Market",
-    "market_ratio": "Market Ratio"
+    "market_ratio": "Market Ratio",
+    "estimated_value": "Estimated Value:",
+    "tier": "Tier"
   },
   "settings": {
     "title": "Settings - Awakened PoE Trade",
@@ -348,6 +350,7 @@
     "auto_search": "Perform an auto search, when pressing",
     "select_stock": "Always select \"Stock\" filter",
     "show_prediction": "Show price prediction",
-    "remember_currency": "Remember the Buyout Currency filter"
+    "remember_currency": "Remember the Buyout Currency filter",
+    "ultimatum_fee": "Inscribed Ultimatum reward fee multiplier (0-1)"
   }
 }

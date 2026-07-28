@@ -4,7 +4,7 @@
     class="p-2 border-dashed border border-gray-600 rounded mt-2"
   >
     <div class="flex items-center text-gray-400 leading-none justify-center">
-      <span class="text-gray-500 mx-1">{{ t("Estimated Value:") }}</span>
+      <span class="text-gray-500 mx-1">{{ t('trade_result.estimated_value') }}</span>
       <span>{{ rewardItem?.quantity || 1 }}</span>
       <span class="font-sans mx-1"> × </span>
       <item-quick-price
@@ -15,8 +15,8 @@
       />
     </div>
 
-    <div v-if="rewardValue.tier !== undefined" class="flex items-center leading-none justify-center mt-2">
-      <span class="text-gray-500 mx-1">{{ t("Tier") }}</span>
+    <div v-if="rewardValue.tier != null" class="flex items-center leading-none justify-center mt-2">
+      <span class="text-gray-500 mx-1">{{ t('trade_result.tier') }}</span>
       <span :class="tierClass">{{ rewardValue.tier }}</span>
     </div>
   </div>
@@ -27,8 +27,12 @@ import { defineComponent, PropType, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { usePoeninja } from '@/web/background/Prices'
 import { ParsedItem, UltimatumRewardType } from '@/parser'
-import { ITEM_BY_TRANSLATED } from '@/assets/data'
+import { ITEM_BY_REF, ITEM_BY_TRANSLATED } from '@/assets/data'
+import { AppConfig } from '@/web/Config'
+import type { PriceCheckWidget } from '@/web/overlay/interfaces'
 import ItemQuickPrice from '@/web/ui/ItemQuickPrice.vue'
+
+const MIRROR_OF_KALANDRA = 'Mirror of Kalandra'
 
 export default defineComponent({
   components: { ItemQuickPrice },
@@ -44,7 +48,11 @@ export default defineComponent({
 
     const TIER_THRESHOLD = 2
 
-    const rewardType = computed(() => props.item.inscribedUltimatum?.reward_type ?? null)
+    // fraction of the reward's market value left after trade/sacrifice overhead
+    const fee = computed(() =>
+      AppConfig<PriceCheckWidget>('price-check')!.ultimatumRewardFee ?? 0.9)
+
+    const rewardType = computed(() => props.item.inscribedUltimatum?.rewardType ?? null)
 
     const rewardItem = computed(() => {
       if (!props.item.inscribedUltimatum) return null
@@ -52,7 +60,7 @@ export default defineComponent({
       if (rewardType.value === UltimatumRewardType.MirroredCopy) {
         // Mirror case: reward is equivalent to 1 Mirror of Kalandra
         return {
-          name: 'Mirror of Kalandra',
+          name: MIRROR_OF_KALANDRA,
           quantity: 1
         }
       }
@@ -64,12 +72,12 @@ export default defineComponent({
         // Use sacrifice item name and multiply quantity by reward multiplier
         return {
           name: props.item.inscribedUltimatum.sacrifice,
-          quantity: props.item.inscribedUltimatum.sacrifice_quantity
+          quantity: props.item.inscribedUltimatum.sacrificeQuantity
         }
       } else {
         // Use reward item name
         return {
-          name: props.item.inscribedUltimatum.reward_unique,
+          name: props.item.inscribedUltimatum.rewardUnique,
           quantity: 1
         }
       }
@@ -78,14 +86,19 @@ export default defineComponent({
     const dbItem = computed(() => {
       if (!rewardItem.value) return null
 
+      // the mirror name is hardcoded in English, every other name comes from
+      // the (possibly localized) clipboard text
+      if (rewardType.value === UltimatumRewardType.MirroredCopy) {
+        return ITEM_BY_REF('ITEM', MIRROR_OF_KALANDRA)?.[0]
+      }
+
       const namespace =
         rewardType.value === UltimatumRewardType.DivinationCard
           ? 'DIVINATION_CARD'
           : rewardType.value === UltimatumRewardType.Unique
             ? 'UNIQUE'
             : 'ITEM'
-      const found = ITEM_BY_TRANSLATED(namespace, rewardItem.value.name)
-      return found?.[0]
+      return ITEM_BY_TRANSLATED(namespace, rewardItem.value.name)?.[0]
     })
 
     const rewardValue = computed(() => {
@@ -95,12 +108,12 @@ export default defineComponent({
       if (rewardType.value === UltimatumRewardType.MirroredCopy) {
         const price = findPriceByQuery({
           ns: 'ITEM',
-          name: 'Mirror of Kalandra',
+          name: dbItem.value.refName,
           variant: undefined
         })
 
         return {
-          price: price ? autoCurrency(price.chaos * 0.95) : undefined, // 5% fee, undefined shows "?"
+          price: price ? autoCurrency(price.chaos * fee.value) : undefined, // undefined shows "?"
           icon: dbItem.value.icon,
           tier: props.item.inscribedUltimatum?.tier
         }
@@ -108,10 +121,8 @@ export default defineComponent({
 
       // Special case: Chaos Orb is the base currency, always worth 1 chaos
       if (rewardType.value === UltimatumRewardType.Currency && dbItem.value.refName === 'Chaos Orb') {
-        const rewardChaos = rewardItem.value.quantity * 0.9 // 10% fee
-
         return {
-          price: autoCurrency(rewardChaos),
+          price: autoCurrency(rewardItem.value.quantity * fee.value),
           icon: dbItem.value.icon,
           tier: props.item.inscribedUltimatum?.tier
         }
@@ -124,32 +135,18 @@ export default defineComponent({
         variant: dbItem.value.unique?.base
       })
 
-      // Calculate: (value of sacrifice) * 0.9
-      let calculatedPrice
-      if (price) {
-        let rewardChaos: number
-        if (
-          rewardType.value === UltimatumRewardType.Currency ||
-          rewardType.value === UltimatumRewardType.DivinationCard
-        ) {
-          // For currency/divination rewards: value of sacrificed items minus 10% fee
-          rewardChaos = price.chaos * rewardItem.value.quantity * 0.9
-        } else {
-          // For unique items: just the value of the unique minus nothing (no sacrifice cost for unique rewards)
-          rewardChaos = price.chaos * rewardItem.value.quantity * 0.9
-        }
-        calculatedPrice = autoCurrency(rewardChaos)
-      }
-
       return {
-        price: calculatedPrice, // undefined shows "?" in ItemQuickPrice
+        // undefined shows "?" in ItemQuickPrice
+        price: price
+          ? autoCurrency(price.chaos * rewardItem.value.quantity * fee.value)
+          : undefined,
         icon: dbItem.value.icon,
         tier: props.item.inscribedUltimatum?.tier
       }
     })
 
     const tierClass = computed(() => {
-      if (!rewardValue.value?.tier) return ''
+      if (rewardValue.value?.tier == null) return ''
       return rewardValue.value.tier < TIER_THRESHOLD ? 'text-yellow-500' : 'text-gray-400'
     })
 
