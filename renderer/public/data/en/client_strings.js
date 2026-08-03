@@ -130,6 +130,9 @@ export default {
   INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY: /^Doubles sacrificed Currency$/,
   INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS: /^Doubles sacrificed Divination Cards$/,
   INSCRIBED_ULTIMATUM_REWARD_MIRRORED_COPY: /^Item and Mirrored Copy$/,
+  VESTIGIAL_NAME: /^Vestigial (.*)$/,
+  VESTIGIAL_IMPLICIT: 'Vestigial Implicit Modifier',
+  SCRYING_MAP_AREA: 'Map Area: ',
   // ---
   CHAT_SYSTEM: /^: (?<body>.+)$/,
   CHAT_TRADE: /^\$(?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,

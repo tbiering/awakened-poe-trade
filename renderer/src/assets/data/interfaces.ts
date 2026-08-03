@@ -63,7 +63,8 @@ export interface BaseType {
     'CAPTURED_BEAST' |
     'UNIQUE' |
     'ITEM' |
-    'GEM'
+    'GEM' |
+    'AREA'
   )
   icon: string
   w?: number
@@ -238,6 +239,9 @@ export interface TranslationDict {
   INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY: RegExp
   INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS: RegExp
   INSCRIBED_ULTIMATUM_REWARD_MIRRORED_COPY: RegExp
+  VESTIGIAL_NAME: RegExp
+  VESTIGIAL_IMPLICIT: string
+  SCRYING_MAP_AREA: string
   // ---
   CHAT_SYSTEM: RegExp
   CHAT_TRADE: RegExp

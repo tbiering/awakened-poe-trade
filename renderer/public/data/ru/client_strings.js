@@ -170,6 +170,9 @@ export default {
   INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY: /^Doubles sacrificed Currency$/,
   INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS: /^Doubles sacrificed Divination Cards$/,
   INSCRIBED_ULTIMATUM_REWARD_MIRRORED_COPY: /^Item and Mirrored Copy$/,
+  VESTIGIAL_NAME: /^Вырожденный: (.*)$/,
+  VESTIGIAL_IMPLICIT: 'Собственное свойство вояжа',
+  SCRYING_MAP_AREA: 'Область карты: ',
   // ---
   CHAT_SYSTEM: /^: (?<body>.+)$/,
   CHAT_TRADE: /^\$(?:<(?<guild_tag>.+?)> )?(?<char_name>.+?): (?<body>.+)$/,
