@@ -98,6 +98,16 @@ export default defineComponent({
           : rewardType.value === UltimatumRewardType.Unique
             ? 'UNIQUE'
             : 'ITEM'
+
+      // prefer the English refName resolved at parse time (works for
+      // localized clients), fall back to the translated-name lookup
+      const refName =
+        rewardType.value === UltimatumRewardType.Unique
+          ? props.item.inscribedUltimatum?.rewardUniqueRefName
+          : props.item.inscribedUltimatum?.sacrificeRefName
+      if (refName) {
+        return ITEM_BY_REF(namespace, refName)?.[0]
+      }
       return ITEM_BY_TRANSLATED(namespace, rewardItem.value.name)?.[0]
     })
 

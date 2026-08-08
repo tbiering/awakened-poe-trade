@@ -53,15 +53,6 @@ export const CATEGORY_TO_TRADE_ID = new Map([
   [ItemCategory.Graft, 'graft']
 ])
 
-// NOTE: keys are lowercased challenge texts, values are option ids
-// from `api/trade/data/filters` -> ultimatum_filters.ultimatum_challenge
-const ULTIMATUM_CHALLENGE_TO_TRADE = new Map([
-  ['survive', 'Survival'],
-  ['defeat waves of enemies', 'Exterminate'],
-  ['protect the altar', 'Defense'],
-  ['stand in the stone circles', 'Conquer']
-])
-
 // NOTE: should match option values on trade
 const ULTIMATUM_REWARD_TO_TRADE = new Map<string, string>([
   [UltimatumRewardType.Currency, 'DoubleCurrency'],
@@ -393,9 +384,9 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[]) {
     const { option } = stat.ultimatum
     switch (stat.tradeId[0]) {
       case 'ultimatum.challenge': {
-        const challengeOption = ULTIMATUM_CHALLENGE_TO_TRADE.get(option.toLowerCase())
-        if (challengeOption) {
-          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_challenge.option', challengeOption)
+        // option is a `UltimatumChallengeType`, whose values match the trade site
+        if (option) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_challenge.option', option)
           hasUltimatumFilters = true
         }
         break
@@ -409,12 +400,17 @@ export function createTradeRequest (filters: ItemFilters, stats: StatFilter[]) {
         break
       }
       case 'ultimatum.input':
-        propSet(query.filters, 'ultimatum_filters.filters.ultimatum_input.option', option)
-        hasUltimatumFilters = true
+        // option is an English refName, empty if the localized name was not resolved
+        if (option) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_input.option', option)
+          hasUltimatumFilters = true
+        }
         break
       case 'ultimatum.output':
-        propSet(query.filters, 'ultimatum_filters.filters.ultimatum_output.option', option)
-        hasUltimatumFilters = true
+        if (option) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_output.option', option)
+          hasUltimatumFilters = true
+        }
         break
     }
   }

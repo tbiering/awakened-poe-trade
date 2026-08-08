@@ -21,13 +21,6 @@ export interface FiltersCreationContext {
 
 const MONSTER_LIFE_STAT_REF = '#% more Monster Life'
 
-const ULTIMATUM_REWARD_LABEL: Record<UltimatumRewardType, string> = {
-  [UltimatumRewardType.Currency]: 'Currency',
-  [UltimatumRewardType.DivinationCard]: 'Divination Card',
-  [UltimatumRewardType.MirroredCopy]: 'Mirrored Copy',
-  [UltimatumRewardType.Unique]: 'Unique'
-}
-
 function createUltimatumFilters (item: ParsedItem): StatFilter[] {
   const ultimatum = item.inscribedUltimatum
   if (item.category !== ItemCategory.Currency || !ultimatum) return []
@@ -39,25 +32,30 @@ function createUltimatumFilters (item: ParsedItem): StatFilter[] {
       statRef: tradeId,
       text,
       ultimatum: { option },
-      disabled: false,
+      // an empty option means the localized text could not be resolved
+      // to a value known by the trade site
+      disabled: !option,
       tag: FilterTag.Pseudo,
       sources: []
     })
   }
 
   if (ultimatum.challenge) {
-    push('ultimatum.challenge', `Challenge: ${ultimatum.challenge}`, ultimatum.challenge)
+    push('ultimatum.challenge', ultimatum.challengeText, ultimatum.challengeType ?? '')
   }
   if (ultimatum.rewardType) {
-    push('ultimatum.reward', `Reward: ${ULTIMATUM_REWARD_LABEL[ultimatum.rewardType]}`, ultimatum.rewardType)
+    const text = (ultimatum.rewardType === UltimatumRewardType.Unique)
+      ? ultimatum.rewardText.replace(ultimatum.rewardUnique, CLIENT_STRINGS.RARITY_UNIQUE)
+      : ultimatum.rewardText
+    push('ultimatum.reward', text, ultimatum.rewardType)
   }
   // trade site only knows uniques/cards/currency as input, a mirrored
   // item's sacrifice is an arbitrary rare and gets rejected with 400
   if (ultimatum.sacrifice && ultimatum.rewardType !== UltimatumRewardType.MirroredCopy) {
-    push('ultimatum.input', `Sacrifice: ${ultimatum.sacrifice}`, ultimatum.sacrifice)
+    push('ultimatum.input', ultimatum.sacrificeText, ultimatum.sacrificeRefName ?? '')
   }
   if (ultimatum.rewardUnique) {
-    push('ultimatum.output', `Reward: ${ultimatum.rewardUnique}`, ultimatum.rewardUnique)
+    push('ultimatum.output', ultimatum.rewardText, ultimatum.rewardUniqueRefName ?? '')
   }
 
   return filters

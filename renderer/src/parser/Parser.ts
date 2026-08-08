@@ -10,7 +10,7 @@ import {
 import { ModifierType, sumStatsByModType } from './modifiers'
 import { linesToStatStrings, tryParseTranslation, getRollOrMinmaxAvg } from './stat-translations'
 import { ItemCategory, ACCESSORY } from './meta'
-import { IncursionRoom, ParsedItem, ItemInfluence, ItemRarity, UltimatumRewardType } from './ParsedItem'
+import { IncursionRoom, ParsedItem, ItemInfluence, ItemRarity, UltimatumRewardType, UltimatumChallengeType } from './ParsedItem'
 import { magicBasetype } from './magic-name'
 import { isModInfoLine, groupLinesByMod, parseModInfoLine, parseModType, ModifierInfo, ParsedModifier, ENCHANT_LINE, SCOURGE_LINE, IMPLICIT_LINE } from './advanced-mod-desc'
 import { calcPropPercentile, QUALITY_STATS } from './calc-q20'
@@ -1142,9 +1142,13 @@ function parseInscribedUltimatumChallenge (section: string[], item: ParsedItem) 
 
   const ultimatumData: NonNullable<ParsedItem['inscribedUltimatum']> = {
     challenge: challenge[1],
+    challengeText: section[0],
+    challengeType: toUltimatumChallengeType(challenge[1]),
     rewardUnique: '',
+    rewardText: '',
     rewardType: UltimatumRewardType.Unique,
     sacrifice: '',
+    sacrificeText: '',
     sacrificeQuantity: 1,
     tier: 4
   }
@@ -1153,6 +1157,7 @@ function parseInscribedUltimatumChallenge (section: string[], item: ParsedItem) 
     const sacrifice = _$.INSCRIBED_ULTIMATUM_SACRIFICE.exec(line)
     if (sacrifice) {
       ultimatumData.sacrifice = sacrifice.groups!.item
+      ultimatumData.sacrificeText = line
       ultimatumData.sacrificeQuantity = Number(sacrifice.groups!.quantity) || 1
       continue
     }
@@ -1160,6 +1165,7 @@ function parseInscribedUltimatumChallenge (section: string[], item: ParsedItem) 
     const reward = _$.INSCRIBED_ULTIMATUM_REWARD.exec(line)
     if (reward) {
       const rewardString = reward[1]
+      ultimatumData.rewardText = line
       if (_$.INSCRIBED_ULTIMATUM_REWARD_DOUBLES_CURRENCY.test(rewardString)) {
         ultimatumData.rewardType = UltimatumRewardType.Currency
       } else if (_$.INSCRIBED_ULTIMATUM_REWARD_DOUBLES_DIVINATION_CARDS.test(rewardString)) {
@@ -1173,8 +1179,31 @@ function parseInscribedUltimatumChallenge (section: string[], item: ParsedItem) 
     }
   }
 
+  if (ultimatumData.sacrifice && ultimatumData.rewardType !== UltimatumRewardType.MirroredCopy) {
+    const ns = (ultimatumData.rewardType === UltimatumRewardType.DivinationCard)
+      ? 'DIVINATION_CARD'
+      : (ultimatumData.rewardType === UltimatumRewardType.Unique)
+          ? 'UNIQUE'
+          : 'ITEM'
+    ultimatumData.sacrificeRefName = ITEM_BY_TRANSLATED(ns, ultimatumData.sacrifice)?.[0]?.refName
+  }
+  if (ultimatumData.rewardUnique) {
+    ultimatumData.rewardUniqueRefName = ITEM_BY_TRANSLATED('UNIQUE', ultimatumData.rewardUnique)?.[0]?.refName
+  }
+
   item.inscribedUltimatum = ultimatumData
   return 'SECTION_PARSED'
+}
+
+function toUltimatumChallengeType (challenge: string): UltimatumChallengeType | undefined {
+  const name = challenge.toLowerCase()
+  switch (name) {
+    case _$.INSCRIBED_ULTIMATUM_CHALLENGE_SURVIVAL.toLowerCase(): return UltimatumChallengeType.Survival
+    case _$.INSCRIBED_ULTIMATUM_CHALLENGE_EXTERMINATE.toLowerCase(): return UltimatumChallengeType.Exterminate
+    case _$.INSCRIBED_ULTIMATUM_CHALLENGE_DEFENSE.toLowerCase(): return UltimatumChallengeType.Defense
+    case _$.INSCRIBED_ULTIMATUM_CHALLENGE_CONQUER.toLowerCase(): return UltimatumChallengeType.Conquer
+    default: return undefined
+  }
 }
 
 function parseInscribedUltimatumMods (section: string[], item: ParsedItem) {
@@ -1182,12 +1211,12 @@ function parseInscribedUltimatumMods (section: string[], item: ParsedItem) {
   if (!item.inscribedUltimatum) return 'PARSER_SKIPPED'
 
   for (const line of section) {
-    const monsterLife = _$.INSCRIBED_ULTIMATUM_TIER.exec(line)
-    if (!monsterLife) continue
+    const parsedStat = tryParseTranslation({ string: line, unscalable: false }, ModifierType.Explicit, item.category)
+    if (!parsedStat || parsedStat.stat.ref !== '#% more Monster Life') continue
 
     // More monster life means a higher difficulty, and thus a lower (better) tier.
     // 200% -> 0, 120% -> 1, 70% -> 2, 30% -> 3, absent -> 4 (set by the challenge parser)
-    const lifePercent = parseInt(monsterLife[1], 10)
+    const lifePercent = parsedStat.roll?.value ?? 0
     if (lifePercent >= 200) {
       item.inscribedUltimatum.tier = 0
     } else if (lifePercent >= 120) {
