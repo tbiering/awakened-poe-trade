@@ -435,7 +435,7 @@ function upgradeConfig (_config: Config): Config {
 
   if (config.configVersion < 19) {
     config.widgets.find(w => w.wmType === 'price-check')!
-      .ultimatumRewardFee = 0.9
+      .ultimatumRewardFee = 0.75
 
     config.configVersion = 19
   }

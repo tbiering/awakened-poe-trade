@@ -116,7 +116,7 @@ export default defineComponent({
         showCursor: true,
         requestPricePrediction: false,
         rememberCurrency: false,
-        ultimatumRewardFee: 0.9
+        ultimatumRewardFee: 0.75
       }
     }
   } satisfies WidgetSpec,

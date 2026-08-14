@@ -50,7 +50,7 @@ export default defineComponent({
 
     // fraction of the reward's market value left after trade/sacrifice overhead
     const fee = computed(() =>
-      AppConfig<PriceCheckWidget>('price-check')!.ultimatumRewardFee ?? 0.9)
+      AppConfig<PriceCheckWidget>('price-check')!.ultimatumRewardFee ?? 0.75)
 
     const rewardType = computed(() => props.item.inscribedUltimatum?.rewardType ?? null)
 
