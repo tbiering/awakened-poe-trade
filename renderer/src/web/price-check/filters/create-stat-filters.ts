@@ -1,7 +1,7 @@
-import { ParsedItem, ItemRarity, ItemCategory } from '@/parser'
+import { ParsedItem, ItemRarity, ItemCategory, UltimatumRewardType } from '@/parser'
 import { ModifierType, StatCalculated, statSourcesTotal, translateStatWithRoll } from '@/parser/modifiers'
 import { percentRoll, percentRollDelta, roundRoll } from './util'
-import { FilterTag, ItemHasEmptyModifier, StatFilter } from './interfaces'
+import { FilterTag, InternalTradeId, ItemHasEmptyModifier, StatFilter } from './interfaces'
 import { filterPseudo } from './pseudo'
 import { applyRules as applyAtzoatlRules } from './pseudo/atzoatl-rules'
 import { applyRules as applyMirroredTabletRules } from './pseudo/reflection-rules'
@@ -17,6 +17,48 @@ export interface FiltersCreationContext {
   readonly searchInRange: number
   filters: StatFilter[]
   statsByType: StatCalculated[]
+}
+
+const MONSTER_LIFE_STAT_REF = '#% more Monster Life'
+
+function createUltimatumFilters (item: ParsedItem): StatFilter[] {
+  const ultimatum = item.inscribedUltimatum
+  if (item.category !== ItemCategory.Currency || !ultimatum) return []
+
+  const filters: StatFilter[] = []
+  function push (tradeId: InternalTradeId, text: string, option: string) {
+    filters.push({
+      tradeId: [tradeId],
+      statRef: tradeId,
+      text,
+      ultimatum: { option },
+      // an empty option means the localized text could not be resolved
+      // to a value known by the trade site
+      disabled: !option,
+      tag: FilterTag.Pseudo,
+      sources: []
+    })
+  }
+
+  if (ultimatum.challenge) {
+    push('ultimatum.challenge', ultimatum.challengeText, ultimatum.challengeType ?? '')
+  }
+  if (ultimatum.rewardType) {
+    const text = (ultimatum.rewardType === UltimatumRewardType.Unique)
+      ? ultimatum.rewardText.replace(ultimatum.rewardUnique, CLIENT_STRINGS.RARITY_UNIQUE)
+      : ultimatum.rewardText
+    push('ultimatum.reward', text, ultimatum.rewardType)
+  }
+  // trade site only knows uniques/cards/currency as input, a mirrored
+  // item's sacrifice is an arbitrary rare and gets rejected with 400
+  if (ultimatum.sacrifice && ultimatum.rewardType !== UltimatumRewardType.MirroredCopy) {
+    push('ultimatum.input', ultimatum.sacrificeText, ultimatum.sacrificeRefName ?? '')
+  }
+  if (ultimatum.rewardUnique) {
+    push('ultimatum.output', ultimatum.rewardText, ultimatum.rewardUniqueRefName ?? '')
+  }
+
+  return filters
 }
 
 export function createExactStatFilters (
@@ -56,6 +98,9 @@ export function createExactStatFilters (
   )) {
     keepByType.push(ModifierType.Explicit)
   } else if (item.rarity === ItemRarity.Rare && item.category === ItemCategory.Idol) {
+    keepByType.push(ModifierType.Explicit)
+  } else if (item.category === ItemCategory.Currency && item.inscribedUltimatum) {
+    // Enable explicit modifiers for Inscribed Ultimatum items
     keepByType.push(ModifierType.Explicit)
   }
 
@@ -103,10 +148,19 @@ export function createExactStatFilters (
     filter.hidden = undefined
 
     if (filter.tag === FilterTag.Explicit) {
-      filter.disabled = !filter.sources.some(source =>
-        source.modifier.info.tier != null &&
-        source.modifier.info.tier <= 2
-      )
+      // Enable Inscribed Ultimatum monster life stat by default
+      if (
+        item.category === ItemCategory.Currency &&
+        item.inscribedUltimatum &&
+        filter.statRef === MONSTER_LIFE_STAT_REF
+      ) {
+        filter.disabled = false
+      } else {
+        filter.disabled = !filter.sources.some(source =>
+          source.modifier.info.tier != null &&
+          source.modifier.info.tier <= 2
+        )
+      }
     } else if (filter.tag !== FilterTag.Property) {
       filter.disabled = false
     }
@@ -136,6 +190,17 @@ export function createExactStatFilters (
     enableAllFilters(ctx.filters)
   } else if (item.category === ItemCategory.Idol) {
     enableGoodRolledFilters(ctx.filters, 0.66)
+  }
+
+  const ultimatumFilters = createUltimatumFilters(item)
+  if (ultimatumFilters.length) {
+    ctx.filters.push(...ultimatumFilters)
+
+    // keep monster life (the tier indicator) last, after the ultimatum pseudo stats
+    const monsterLifeIndex = ctx.filters.findIndex(f => f.statRef === MONSTER_LIFE_STAT_REF)
+    if (monsterLifeIndex !== -1) {
+      ctx.filters.push(...ctx.filters.splice(monsterLifeIndex, 1))
+    }
   }
 
   return ctx.filters

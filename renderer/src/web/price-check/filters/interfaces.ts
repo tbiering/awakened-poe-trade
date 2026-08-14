@@ -121,6 +121,7 @@ export interface StatFilter {
   text: string
   tag: FilterTag
   oils?: string[]
+  ultimatum?: { option: string }
   sources: StatCalculated['sources']
   not?: true
   roll?: {
@@ -168,7 +169,11 @@ const _INTERNAL_TRADE_IDS = [
   'item.heist_job_deception',
   'item.heist_job_engineering',
   'item.heist_target_priceless',
-  'item.chart_sulphur'
+  'item.chart_sulphur',
+  'ultimatum.challenge',
+  'ultimatum.reward',
+  'ultimatum.input',
+  'ultimatum.output'
 ] as const
 
 export type InternalTradeId = typeof _INTERNAL_TRADE_IDS[number]

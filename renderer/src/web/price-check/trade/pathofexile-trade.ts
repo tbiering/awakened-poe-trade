@@ -1,4 +1,4 @@
-import { ItemInfluence, ItemCategory } from '@/parser'
+import { ItemInfluence, ItemCategory, UltimatumRewardType } from '@/parser'
 import { ItemFilters, StatFilter, FilterOrGroup, INTERNAL_TRADE_IDS, InternalTradeId } from '../filters/interfaces'
 import { setProperty as propSet } from 'dot-prop'
 import { DateTime } from 'luxon'
@@ -52,6 +52,14 @@ export const CATEGORY_TO_TRADE_ID = new Map([
   [ItemCategory.Idol, 'idol'],
   [ItemCategory.Graft, 'graft'],
   [ItemCategory.Chart, 'chart']
+])
+
+// NOTE: should match option values on trade
+const ULTIMATUM_REWARD_TO_TRADE = new Map<string, string>([
+  [UltimatumRewardType.Currency, 'DoubleCurrency'],
+  [UltimatumRewardType.DivinationCard, 'DoubleDivCards'],
+  [UltimatumRewardType.MirroredCopy, 'MirrorRare'],
+  [UltimatumRewardType.Unique, 'ExchangeUnique']
 ])
 
 const TOTAL_MODS_TEXT = {
@@ -189,6 +197,15 @@ interface TradeRequest {
       sentinel_filters?: {
         filters: {
           sentinel_durability?: FilterRange
+        }
+      }
+      ultimatum_filters?: {
+        disabled?: boolean
+        filters: {
+          ultimatum_challenge?: { option?: string }
+          ultimatum_reward?: { option?: string }
+          ultimatum_input?: { option?: string }
+          ultimatum_output?: { option?: string }
         }
       }
       trade_filters?: {
@@ -365,6 +382,49 @@ export function createTradeRequest (filters: ItemFilters, stats: FilterOrGroup[]
 
   if (filters.stackSize && !filters.stackSize.disabled) {
     propSet(query.filters, 'misc_filters.filters.stack_size.min', filters.stackSize.value)
+  }
+
+  // Inscribed Ultimatum pseudo stats
+  let hasUltimatumFilters = false
+  for (const stat of stats) {
+    if (stat.group || stat.disabled || !stat.ultimatum) continue
+
+    const { option } = stat.ultimatum
+    switch (stat.tradeId[0]) {
+      case 'ultimatum.challenge': {
+        // option is a `UltimatumChallengeType`, whose values match the trade site
+        if (option) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_challenge.option', option)
+          hasUltimatumFilters = true
+        }
+        break
+      }
+      case 'ultimatum.reward': {
+        const rewardOption = ULTIMATUM_REWARD_TO_TRADE.get(option)
+        if (rewardOption) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_reward.option', rewardOption)
+          hasUltimatumFilters = true
+        }
+        break
+      }
+      case 'ultimatum.input':
+        // option is an English refName, empty if the localized name was not resolved
+        if (option) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_input.option', option)
+          hasUltimatumFilters = true
+        }
+        break
+      case 'ultimatum.output':
+        if (option) {
+          propSet(query.filters, 'ultimatum_filters.filters.ultimatum_output.option', option)
+          hasUltimatumFilters = true
+        }
+        break
+    }
+  }
+
+  if (hasUltimatumFilters) {
+    propSet(query.filters, 'ultimatum_filters.disabled', false)
   }
 
   if (filters.linkedSockets && !filters.linkedSockets.disabled) {

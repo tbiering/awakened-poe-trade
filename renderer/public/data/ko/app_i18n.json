@@ -291,7 +291,9 @@
     "getting_price_from": "from poe.ninja \u2026",
     "you_have": "가진 갯수",
     "stack": "스택",
-    "market_ratio": "시장 비율"
+    "market_ratio": "시장 비율",
+    "estimated_value": "예상 가치:",
+    "tier": "티어"
   },
   "settings": {
     "title": "세팅 - Awakened PoE Trade",
@@ -340,6 +342,7 @@
     "auto_search": "Perform an auto search, when pressing",
     "select_stock": "Always select \"Stock\" filter",
     "show_prediction": "Show price prediction",
-    "remember_currency": "Remember the Buyout Currency filter"
+    "remember_currency": "Remember the Buyout Currency filter",
+    "ultimatum_fee": "새겨진 결전 보상 수수료"
   }
 }

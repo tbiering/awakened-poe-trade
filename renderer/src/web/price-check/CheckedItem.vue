@@ -8,6 +8,7 @@
     <price-trend v-else
       :item="item"
       :filters="itemFilters" />
+    <ultimatum-reward :item="item" />
     <filters-block
       ref="filtersComponent"
       :filters="itemFilters"
@@ -60,6 +61,7 @@ import FiltersBlock from './filters/FiltersBlock.vue'
 import { createPresets } from './filters/create-presets'
 import PricePrediction from './price-prediction/PricePrediction.vue'
 import StackValue from './stack-value/StackValue.vue'
+import UltimatumReward from './ultimatum-reward/UltimatumReward.vue'
 import FilterName from './filters/FilterName.vue'
 import { CATEGORY_TO_TRADE_ID, createTradeRequest } from './trade/pathofexile-trade'
 import { AppConfig } from '@/web/Config'
@@ -79,7 +81,8 @@ export default defineComponent({
     PriceTrend,
     FiltersBlock,
     FilterName,
-    StackValue
+    StackValue,
+    UltimatumReward
   },
   props: {
     item: {

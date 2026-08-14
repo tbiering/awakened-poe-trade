@@ -244,6 +244,9 @@ export default defineComponent({
       text: computed(() => {
         if (!INTERNAL_TRADE_IDS.includes(props.filter.tradeId[0])) {
           return props.filter.text
+        } else if (props.filter.tradeId[0].startsWith('ultimatum.')) {
+          // Inscribed Ultimatum filters use custom text labels
+          return props.filter.text
         } else {
           return t(props.filter.tradeId[0], ['#', '#'])
         }

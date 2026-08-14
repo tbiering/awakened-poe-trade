@@ -89,6 +89,20 @@ export interface ParsedItem {
     text: string
     type: ModifierType
   }>
+  inscribedUltimatum?: {
+    challenge: string
+    challengeText: string
+    challengeType?: UltimatumChallengeType
+    rewardUnique: string
+    rewardUniqueRefName?: string
+    rewardText: string
+    rewardType: UltimatumRewardType
+    sacrifice: string
+    sacrificeRefName?: string
+    sacrificeText: string
+    sacrificeQuantity: number
+    tier: number
+  }
   category?: ItemCategory
   info: BaseType
   rawText: string
@@ -98,6 +112,21 @@ export interface ParsedItem {
 export enum IncursionRoom {
   Open = 1,
   Obstructed = 2
+}
+
+export enum UltimatumRewardType {
+  Currency = 'currency',
+  DivinationCard = 'divination_card',
+  MirroredCopy = 'mirrored_copy',
+  Unique = 'unique'
+}
+
+// NOTE: should match option values on trade
+export enum UltimatumChallengeType {
+  Survival = 'Survival',
+  Exterminate = 'Exterminate',
+  Defense = 'Defense',
+  Conquer = 'Conquer'
 }
 
 export function createVirtualItem (
