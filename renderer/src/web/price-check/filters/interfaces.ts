@@ -71,7 +71,6 @@ export interface ItemFilters {
     name: string
     nameTrade: string
   }
-  scryingMapArea?: string
   itemLevel?: FilterNumeric
   stackSize?: FilterNumeric
   unidentified?: {
@@ -105,13 +104,13 @@ export interface FilterNumeric {
 
 export type FilterOrGroup =
   | StatFilter
-  | MercenaryFilterGroup
+  | FilterGroup
 
-export interface MercenaryFilterGroup {
-  group: 'mercenary'
+export interface FilterGroup {
+  group: 'not' | 'mercenary'
   expanded: boolean // NOTE: mutable in UI
-  skill: StatFilter
-  supports: StatFilter[]
+  meta: StatFilter
+  stats: StatFilter[]
 }
 
 export interface StatFilter {
@@ -122,6 +121,7 @@ export interface StatFilter {
   tag: FilterTag
   oils?: string[]
   ultimatum?: { option: string }
+  mercenary?: { icon?: string, tier?: number }
   sources: StatCalculated['sources']
   not?: true
   roll?: {
@@ -143,6 +143,7 @@ export interface StatFilter {
 }
 
 const _INTERNAL_TRADE_IDS = [
+  'item.not_group',
   'item.base_percentile',
   'item.memory_strands',
   'item.armour',
@@ -156,6 +157,7 @@ const _INTERNAL_TRADE_IDS = [
   'item.crit',
   'item.aps',
   'item.has_empty_modifier',
+  'item.mercenary_6link',
   'item.map_item_quantity',
   'item.map_item_rarity',
   'item.map_pack_size',
@@ -210,5 +212,11 @@ export enum FilterTag {
   Unveiled = 'explicit-veiled',
   Incursion = 'explicit-incursion',
   Infamous = 'explicit-infamous',
-  Essence = 'explicit-essence'
+  Essence = 'explicit-essence',
+  Brick = 'brick',
+  MercenaryPrimary = 'mercenary-primary',
+  MercenarySecondary = 'mercenary-secondary',
+  MercenaryUtility = 'mercenary-utility',
+  MercenarySupport = 'mercenary-support',
+  FilterGroup = 'filter-group'
 }

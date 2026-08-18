@@ -21,7 +21,7 @@ export interface Stat {
   modFamily?: string[]
   fromAreaMods?: 'yes' | 'ubermap_exclusive' | 'heist_exclusive'
   anointments?: Array<{ roll: number, oils: string }>
-  mercenary?: { supportTier?: number }
+  mercenary?: { icon?: string, supports?: string[], tier?: number, canonical?: string, syntheticFamily?: true }
   trade: {
     inverted?: true
     option?: true
@@ -94,8 +94,9 @@ export interface BaseType {
     fixedStats?: Array<Stat['ref']>
     disenchantValue?: number
   }
-  map?: {
+  area?: {
     screenshot?: string
+    special?: true
   }
   gem?: {
     vaal?: true
@@ -109,6 +110,14 @@ export interface BaseType {
     es?: [min: number, max: number]
     ward?: [min: number, max: number]
   }
+}
+
+export interface MercenaryBuild {
+  name: string
+  skills: Array<{
+    type: 'primary' | 'secondary' | 'utility'
+    name: string
+  }>
 }
 
 export interface TranslationDict {
@@ -248,6 +257,7 @@ export interface TranslationDict {
   VESTIGIAL_IMPLICIT: string
   SCRYING_MAP_AREA: string
   CHART_SULPHUR: string
+  MERCENARY_LEVEL: string
   // ---
   CHAT_SYSTEM: RegExp
   CHAT_TRADE: RegExp
